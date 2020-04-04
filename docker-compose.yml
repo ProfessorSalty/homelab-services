@@ -1,0 +1,489 @@
+version: "3.5"
+
+networks:
+    proxy:
+        name: proxy
+    nextcloud:
+    gitea:
+    authelia:
+
+volumes:
+    nextcloud:
+    jenkinsdata:
+    ldap-config:
+    ldap-db:
+
+services:
+    ###############################
+    #          Ouroboros          #
+    ###############################
+
+    ouroboros:
+        image: pyouroboros/ouroboros
+        container_name: ouroboros
+        environment:
+            - CLEANUP=true
+            - INTERVAL=300
+            - LOG_LEVEL=info
+            - SELF_UPDATE=true
+            - TZ
+        restart: unless-stopped
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+
+    ###############################
+    #     docker-socket-proxy     #
+    ###############################
+
+    dockerproxy:
+        image: tecnativa/docker-socket-proxy
+        container_name: dockerproxy
+        restart: unless-stopped
+        environment:
+            - CONTAINERS=1
+            - TZ
+        logging:
+            driver: "none"
+        networks:
+            - proxy
+        ports:
+            - 2375
+        volumes:
+            - "/var/run/docker.sock:/var/run/docker.sock"
+
+    
+    ###############################
+    #           Authelia          #
+    ###############################
+
+    authelia:
+        image: authelia/authelia
+        container_name: authelia
+        depends_on:
+            - authelia-cache
+            - authelia-db
+        volumes:
+            - ../authelia:/var/lib/authelia
+            - ./configs/authelia/configuration.yml:/etc/authelia/configuration.yml:ro
+        expose:
+            - 9091
+        networks:
+            - proxy
+            - authelia
+        labels:
+            - 'traefik.enable=true'
+            - 'traefik.http.routers.authelia.rule=Host(`${AUTHELIA_DOMAIN}`)'
+            - 'traefik.http.routers.authelia.entrypoints=secure'
+            # The rd param points to the login endpoint
+            # https://github.com/authelia/authelia/blob/6f116202f487a653a6579fe4232e4677529bd480/internal/handlers/handler_verify.go#L205
+            - 'traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://${AUTHELIA_DOMAIN}'
+            - 'traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true'
+            - 'traefik.http.routers.authelia.tls=true'
+            - 'traefik.http.routers.authelia.tls.certresolver=le'
+        restart: unless-stopped
+        environment:
+            - AUTHELIA_SESSION_SECRET
+            - AUTHELIA_JWT_SECRET
+            - AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD=${LDAP_ADMIN_PASSWORD}
+            - AUTHELIA_STORAGE_POSTGRES_PASSWORD
+            # - AUTHELIA_NOTIFIER_SMTP_PASSWORD
+            - TZ
+
+    authelia-cache:
+        image: redis:alpine
+        container_name: authelia-cache
+        environment:
+            - TZ
+        expose:
+            - 6379
+        restart: unless-stopped
+        networks:
+            - authelia
+
+    authelia-db:
+        image: postgres:12-alpine
+        container_name: authelia-db
+        restart: unless-stopped
+        expose:
+            - 5432
+        networks:
+            - authelia
+        environment:
+            - POSTGRES_DB=authelia
+            - POSTGRES_USER=authelia
+            - POSTGRES_PASSWORD=${AUTHELIA_STORAGE_POSTGRES_PASSWORD}
+            - TZ
+        volumes:
+            - ../autheliadb:/var/lib/postgresql/data
+
+    ###############################
+    #           Traefix           #
+    ###############################
+
+    traefik:
+        image: traefik:latest
+        container_name: traefik
+        restart: unless-stopped
+        depends_on:
+            - dockerproxy
+        environment:
+            - TZ
+        command:
+            # - --log.level=DEBUG
+            - --entrypoints.web.address=:80
+            - --entrypoints.secure.address=:443
+            - --providers.docker
+            - --providers.docker.exposedByDefault=false
+            - --providers.docker.network=proxy
+            - --providers.docker.endpoint=tcp://dockerproxy:2375
+            - --api
+            - --certificatesresolvers.le.acme.email=${LETSENCRYPT_EMAIL}
+            - --certificatesresolvers.le.acme.storage=${TRAEFIK_ROOT}/acme.json
+            - --certificatesresolvers.le.acme.tlschallenge=true
+        labels:
+            - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
+            - "traefik.http.routers.traefik.rule=Host(`${DASHBOARD_DOMAIN}`)"
+            - "traefik.http.routers.traefik.middlewares=authelia@docker"
+            - "traefik.http.routers.traefik.tls.certresolver=le"
+            - "traefik.http.routers.traefik.entrypoints=secure"
+            - "traefik.http.routers.traefik.service=api@internal"
+            - "traefik.http.routers.redirs.rule=hostregexp(`{host:.+}`)"
+            - "traefik.http.routers.redirs.middlewares=https-redirect"
+            - "traefik.http.routers.redirs.entrypoints=web"
+            - "traefik.enable=true"
+        networks:
+            - proxy
+        ports:
+            - "59998:80"
+            - "59999:443"
+        volumes:
+            - ./acme.json:/acme.json
+
+    ###############################
+    #           OpenLDAP          #
+    ###############################
+
+    openldap:
+        image: osixia/openldap:1.3.0
+        container_name: openldap
+        environment:
+            - LDAP_RFC2307BIS_SCHEMA=true
+            - KEEP_EXISTING_CONFIG=true
+            - LDAP_ORGANISATION
+            - LDAP_DOMAIN
+            - LDAP_ADMIN_PASSWORD
+            - LDAP_CONFIG_PASSWORD
+            - LDAP_BASE_DN=${LDAP_LOGIN_BASE}
+            - LDAP_READONLY_USER=true
+            - LDAP_READONLY_USER_USERNAME
+            - LDAP_READONLY_USER_PASSWORD
+            - TZ
+        tty: true
+        stdin_open: true
+        volumes:
+            - ../ldap/ldap-config:/var/lib/ldap
+            - ../ldap/ldap-db:/etc/ldap/slap.d
+        ports:
+            - "389:389"
+            - "636:636"
+        networks:
+            - proxy
+        command: --copy-service
+
+    ###############################
+    #    LDAP User Management     #
+    ###############################
+
+    ldapusermanagement:
+        image: wheelybird/ldap-user-manager
+        container_name: lum
+        environment:
+            - NO_HTTPS=TRUE
+            - LDAP_REQUIRE_STARTTLS=FALSE
+            - LDAP_URI=ldap://openldap 
+            - LDAP_ADMINS_GROUP=admins 
+            - SERVER_HOSTNAME=${LUM_DOMAIN} 
+            - LDAP_BASE_DN=${LDAP_LOGIN_BASE} 
+            - LDAP_ADMIN_BIND_DN=cn=admin,${LDAP_LOGIN_BASE} 
+            - LDAP_ADMIN_BIND_PWD=${LDAP_ADMIN_PASSWORD}
+            - TZ
+        depends_on:
+            - openldap
+        networks:
+            - proxy
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.lum.rule=Host(`${LUM_DOMAIN}`)"
+            - "traefik.http.routers.lum.entrypoints=secure"
+            - "traefik.http.routers.lum.tls.certresolver=le"
+
+    ###############################
+    #           Nextcloud         #
+    ###############################
+
+    nextcloud-server:
+        image: nginx:alpine
+        restart: unless-stopped
+        container_name: nextcloud-server
+        depends_on:
+            - nextcloud-data
+        volumes:
+            - nextcloud:/var/www/html:ro
+            - ./configs/nextcloud/nginx.conf:/etc/nginx/nginx.conf:ro
+        environment:
+            - TZ
+        networks:
+            - proxy
+            - nextcloud
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+            - "traefik.http.middlewares.nextcloud-caldav.redirectregex.permanent=true"
+            - "traefik.http.middlewares.nextcloud-caldav.redirectregex.regex=^https://(.*)/.well-known/(card|cal)dav"
+            - "traefik.http.middlewares.nextcloud-caldav.redirectregex.replacement=https://$${1}/remote.php/dav/"
+            - "traefik.http.routers.nextcloud.middlewares=nextcloud-caldav@docker,authelia@docker"
+            - "traefik.http.routers.nextcloud.entrypoints=secure"
+            - "traefik.http.routers.nextcloud.rule=Host(`${NEXTCLOUD_DOMAIN}`)"
+            - "traefik.http.routers.nextcloud.tls=true"
+            - "traefik.http.routers.nextcloud.tls.certresolver=le"
+
+    nextcloud-data:
+        image: nextcloud:18-fpm-alpine
+        restart: unless-stopped
+        container_name: nextcloud
+        networks:
+            - proxy
+            - nextcloud
+        depends_on:
+            - nextcloud-db
+            - nextcloud-cache
+        volumes:
+            - nextcloud:/var/www/html
+            - ../nextclouddata:/var/www/html/data
+        environment:
+            - NEXTCLOUD_ADMIN_USER
+            - NEXTCLOUD_ADMIN_PASSWORD
+            - POSTGRES_USER=${NEXTCLOUD_DB_USER}
+            - POSTGRES_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+            - POSTGRES_HOST=nextcloud-db
+            - POSTGRES_DB=nextcloud
+            - NEXTCLOUD_HOSTNAME=${NEXTCLOUD_DOMAIN}
+            - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_DOMAIN} localhost
+            - REDIS_HOST=nextcloud-cache
+            - TZ
+
+    nextcloud-db:
+        image: postgres:12-alpine
+        container_name: nextcloud-db
+        restart: unless-stopped
+        networks:
+            - nextcloud
+        environment:
+            - POSTGRES_DB=nextcloud
+            - POSTGRES_USER=${NEXTCLOUD_DB_USER}
+            - POSTGRES_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+            - TZ
+        volumes:
+            - ../nextclouddb:/var/lib/postgresql/data
+
+    nextcloud-cache:
+        image: redis:alpine
+        container_name: nextcloud-cache
+        restart: unless-stopped
+        environment:
+            - TZ
+        networks:
+            - nextcloud
+
+    ###############################
+    #           Emby              #
+    ###############################
+
+    emby:
+        image: emby/embyserver:latest
+        container_name: emby
+        restart: unless-stopped
+        logging:
+            driver: "none"
+        networks:
+            - proxy
+        environment:
+            - TZ
+        volumes:
+            - /mnt/movies1:/mnt/movies1:ro
+            - /mnt/movies2:/mnt/movies2:ro
+            - /mnt/other2/movies3:/mnt/movies3:ro
+            - /mnt/other2/tv2:/mnt/tv2:ro
+            - /mnt/other/embyconfig:/config
+            - /mnt/other:/mnt/other:ro
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.services.emby.loadbalancer.server.port=8096"
+            - "traefik.http.routers.emby.rule=Host(`${EMBY_DOMAIN}`)"
+            - "traefik.http.routers.emby.entrypoints=secure"
+            - "traefik.http.routers.emby.tls.certresolver=le"
+            - "traefik.http.routers.emby.middlewares=authelia"
+
+    ###############################
+    #           Jellyfin          #
+    ###############################
+
+    jellyfin:
+        image: jellyfin/jellyfin
+        container_name: jellyfin
+        restart: unless-stopped
+        networks:
+            - proxy
+        volumes:
+            - /mnt/movies1:/mnt/movies1:ro
+            - /mnt/movies2:/mnt/movies2:ro
+            - /mnt/other2/movies3:/mnt/movies3:ro
+            - /mnt/other2/tv2:/mnt/tv2:ro
+            - /mnt/other/jellyfinconfig:/config
+            - /mnt/other:/mnt/other:ro
+        environment:
+            - TZ
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
+            - "traefik.http.routers.jellyfin.rule=Host(`${JELLYFIN_DOMAIN}`)"
+            - "traefik.http.routers.jellyfin.entrypoints=secure"
+            - "traefik.http.routers.jellyfin.tls.certresolver=le"
+
+    ###############################
+    #           Lychee            #
+    ###############################
+
+    lychee:
+        image: kdelfour/lychee-docker
+        container_name: lychee
+        restart: unless-stopped
+        networks:
+            - proxy
+        volumes:
+            - ../lychee/data:/data
+            - ../lychee/uploads:/uploads
+            - ../lychee/db:/mysql
+        environment:
+            - TZ
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.lychee.rule=Host(`${LYCHEE_DOMAIN}`)"
+            - "traefik.http.routers.lychee.entrypoints=secure"
+            - "traefik.http.routers.lychee.tls.certresolver=le"
+
+    ###############################
+    #           Heimdall          #
+    ###############################
+
+    heimdall:
+        image: linuxserver/heimdall
+        container_name: heimdall
+        networks:
+            - proxy
+        environment:
+            - TZ
+        volumes:
+            - ../heimdall:/config
+        restart: unless-stopped
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.heimdall.rule=Host(`${HEIMDALL_DOMAIN}`)"
+            - "traefik.http.routers.heimdall.entrypoints=secure"
+            - "traefik.http.routers.heimdall.tls.certresolver=le"
+
+
+    ###############################
+    #           Gitea             #
+    ###############################
+
+    gitea:
+        image: gitea/gitea:1
+        depends_on:
+            - gitea-db
+        environment:
+            - DB_TYPE=postgres
+            - DB_HOST=gitea-db:5432
+            - DB_NAME=gitea
+            - DB_USER=${GITEA_DB_USER}
+            - DB_PASSWD=${GITEA_DB_PASSWORD}
+            - TZ
+        restart: unless-stopped
+        networks:
+            - proxy
+            - gitea
+        volumes:
+            - ../gitea:/data
+            - /etc/timezone:/etc/timezone:ro
+            - /etc/localtime:/etc/localtime:ro
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.gitea.rule=Host(`${GITEA_DOMAIN}`)"
+            - "traefik.http.services.gitea.loadbalancer.server.port=3000"
+            - "traefik.http.routers.gitea.entrypoints=secure"
+            - "traefik.http.routers.gitea.tls.certresolver=le"
+
+    gitea-db:
+        image: postgres:12-alpine
+        container_name: gitea-db
+        restart: unless-stopped
+        networks:
+            - gitea
+        environment:
+            - POSTGRES_DB=gitea
+            - POSTGRES_USER=gitea
+            - POSTGRES_PASSWORD=${GITEA_DB_PASSWORD}
+            - TZ
+        volumes:
+            - ../giteadb:/var/lib/postgresql/data
+
+    ###############################
+    #         Transmission        #
+    ###############################
+
+    transmission:
+        image: linuxserver/transmission
+        container_name: transmission
+        restart: unless-stopped
+        networks:
+            - proxy
+        depends_on:
+            - traefik
+        environment:
+            - TZ
+        ports:
+            - 51413:51413
+            - 51413:51413/udp
+        volumes:
+            - ./configs/transmission:/config
+            - ../downloads/:/downloads
+            - ../torrentfiles:/watch
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.transmission.rule=Host(`${TRANSMISSION_DOMAIN}`)"
+            - "traefik.http.services.transmission.loadbalancer.server.port=9091"
+            - "traefik.http.routers.transmission.entrypoints=secure"
+            - "traefik.http.routers.transmission.tls.certresolver=le"
+
+    ###############################
+    #           Jenkins           #
+    ###############################
+
+    jenkins:
+        image: jenkins/jenkins:alpine
+        container_name: jenkins
+        restart: unless-stopped
+        environment:
+            - TZ
+        networks:
+            - proxy
+        volumes:
+            - jenkinsdata:/var/jenkins_home
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.jenkins.rule=Host(`${JENKINS_DOMAIN}`)"
+            - "traefik.http.services.jenkins.loadbalancer.server.port=8080"
+            - "traefik.http.routers.jenkins.entrypoints=secure"
+            - "traefik.http.routers.jenkins.tls.certresolver=le"
+
+    
