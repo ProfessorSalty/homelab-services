@@ -1,0 +1,62 @@
+host: 0.0.0.0
+port: 9091
+log_level: debug
+totp:
+  issuer: {{example.com}}
+  period: 30
+  skew: 1
+
+authentication_backend:
+  ldap:
+    url: ldap://openldap
+    skip_verify: true
+    base_dn: {{dc=example,dc=com}}
+    username_attribute: uid
+    additional_users_dn: ou=people
+    users_filter: (&({username_attribute}={input})(objectClass=person))
+    additional_groups_dn: ou=groups
+    groups_filter: (&(member={dn})(objectclass=groupOfNames))
+    group_name_attribute: cn
+    mail_attribute: mail
+    user: cn=admin,{{dc=example,dc=com}}
+
+access_control:
+  default_policy: deny
+
+  rules:
+    - domain: {{example.com}}
+      policy: one_factor
+
+session:
+  name: authelia_session
+  expiration: 3600 # 1 hour
+  inactivity: 300 # 5 minutes
+  domain: {{example.com}}
+
+  redis:
+    host: authelia-cache
+    port: 6379
+    # This is the Redis DB Index https://redis.io/commands/select (sometimes referred to as database number, DB, etc).
+    database_index: 0
+
+regulation:
+  # The number of failed login attempts before user is banned.
+  # Set it to 0 to disable regulation.
+  # max_retries: 3
+  max_retries: 0
+  # The user is banned if the authentication failed 'max_retries' times in a 'find_time' seconds window.
+  find_time: 120
+  # The length of time before a banned user can login again.
+  ban_time: 300
+
+storage:
+  postgres:
+    host: authelia-db
+    port: 5432
+    database: authelia
+    username: authelia
+
+notifier:
+  # For testing purpose, notifications can be sent in a file
+  filesystem:
+    filename: /tmp/authelia/notification.txt
