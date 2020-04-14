@@ -1,5 +1,7 @@
 version: "3.5"
 
+# https://www.allkeysgenerator.com/Random/Security-Encryption-Key-Generator.aspx
+
 networks:
     proxy:
         name: proxy
@@ -7,30 +9,89 @@ networks:
     gitea:
     authelia:
     lychee:
+    bookstack:
+    firefly:
+    mastadon:
+    wekan:
+    freshrss:
+    wallabag:
+    exporters:
+    portus:
+    jaeger:
 
 volumes:
     nextcloud:
     jenkinsdata:
     lychee-db:
     portainer_data:
+    bookstack:
 
 services:
     ###############################
     #          Ouroboros          #
     ###############################
 
-    ouroboros:
-        image: pyouroboros/ouroboros
-        container_name: ouroboros
-        environment:
-            - CLEANUP=true
-            - INTERVAL=300
-            - LOG_LEVEL=info
-            - SELF_UPDATE=true
-            - TZ
-        restart: unless-stopped
-        volumes:
-            - /var/run/docker.sock:/var/run/docker.sock
+    # ouroboros:
+    #     image: pyouroboros/ouroboros
+    #     container_name: ouroboros
+    #     environment:
+    #         - CLEANUP=true
+    #         - INTERVAL=300
+    #         - LOG_LEVEL=info
+    #         - SELF_UPDATE=true
+    #         - TZ
+    #     restart: unless-stopped
+    #     volumes:
+    #         - /var/run/docker.sock:/var/run/docker.sock
+
+    ###############################
+    #          Prometheus         #
+    ###############################
+
+    # prometheus:
+    #     image: prom/prometheus
+    #     container_name: prometheus
+    #     restart: unless-stopped
+    #     networks:
+    #         - proxy
+    #         - exporters
+    #     volumes:
+    #         - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.prometheus.rule=Host(`${PROMETHEUS_DOMAIN:?Domain for Prometheus must be set!}`)"
+    #         - "traefik.http.routers.prometheus.entrypoints=secure"
+    #         - "traefik.http.routers.prometheus.middlewares=authelia@docker"
+    #         - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
+    #         - "traefik.http.routers.prometheus.tls.certresolver=le"
+
+    # ###############################
+    # #          Grafana            #
+    # ###############################
+
+    # grafana:
+    #     image: grafana/grafana
+    #     container_name: grafana
+    #     networks:
+    #         - proxy
+    #     environment:
+    #         - GF_SECURITY_ADMIN_USER=admin
+    #         - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    #         - GF_REMOTE_CACHE_TYPE=redis
+    #         - GF_REMOTE_CACHE_CONNSTR=addr=grafana-cache:6379,pool_size=100,db=0,ssl=false
+    #         - GF_AUTH_LDAP_ENABLED=true
+    #         - GF_AUTH_LDAP_ALLOW_SIGN_UP=true
+    #         - GF_AUTH_LDAP_CONFIG_FILE=/etc/grafana/ldap.toml
+    #         - LDAP_LOGIN_BASE
+    #         - LDAP_ADMIN_PASSWORD
+    #     volumes:
+    #         - ./configs/graphana/ldap.toml:/etc/grafana/ldap.toml
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.grafana.rule=Host(`${GRAFANA_DOMAIN:?Domain for Grafana must be set!}`)"
+    #         - "traefik.http.routers.grafana.entrypoints=secure"
+    #         - "traefik.http.services.grafana.loadbalancer.server.port=3000"
+    #         - "traefik.http.routers.grafana.tls.certresolver=le"
 
     ###############################
     #     docker-socket-proxy     #
@@ -62,7 +123,6 @@ services:
         volumes:
             - "/var/run/docker.sock:/var/run/docker.sock"
 
-    
     ###############################
     #           Portainer         #
     ###############################
@@ -81,7 +141,7 @@ services:
             - "traefik.http.routers.portainer.entrypoints=secure"
             - "traefik.http.services.portainer.loadbalancer.server.port=9000"
             - "traefik.http.routers.portainer.tls.certresolver=le"
-    
+
     ###############################
     #           Authelia          #
     ###############################
@@ -101,15 +161,15 @@ services:
             - proxy
             - authelia
         labels:
-            - 'traefik.enable=true'
-            - 'traefik.http.routers.authelia.rule=Host(`${AUTHELIA_DOMAIN:?Domain for Authelia must be set!}`)'
-            - 'traefik.http.routers.authelia.entrypoints=secure'
+            - "traefik.enable=true"
+            - "traefik.http.routers.authelia.rule=Host(`${AUTHELIA_DOMAIN:?Domain for Authelia must be set!}`)"
+            - "traefik.http.routers.authelia.entrypoints=secure"
             # The rd param points to the login endpoint
             # https://github.com/authelia/authelia/blob/6f116202f487a653a6579fe4232e4677529bd480/internal/handlers/handler_verify.go#L205
-            - 'traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://${AUTHELIA_DOMAIN}'
-            - 'traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true'
-            - 'traefik.http.routers.authelia.tls=true'
-            - 'traefik.http.routers.authelia.tls.certresolver=le'
+            - "traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://${AUTHELIA_DOMAIN}"
+            - "traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true"
+            - "traefik.http.routers.authelia.tls=true"
+            - "traefik.http.routers.authelia.tls.certresolver=le"
         restart: unless-stopped
         environment:
             - AUTHELIA_SESSION_SECRET
@@ -146,7 +206,7 @@ services:
             - ${SERVICES_ROOT}/${AUTHELIA_ROOT:-authelia}/db:/var/lib/postgresql/data
 
     ###############################
-    #           Traefix           #
+    #           Traefik           #
     ###############################
 
     traefik:
@@ -159,15 +219,19 @@ services:
             - TZ
         command:
             # - --log.level=DEBUG
+            # - --metrics.prometheus=true
+            # - --tracing.jaeger=true
+            # - --tracing.jaeger.samplingServerURL=http://jaeger-agent:5778/sampling
             - --entrypoints.web.address=:80
             - --entrypoints.secure.address=:443
+            - --entrypoints.ssh.address=:22
             - --providers.docker
             - --providers.docker.exposedByDefault=false
             - --providers.docker.network=proxy
             - --providers.docker.endpoint=tcp://dockerproxy:2375
             - --api
             - --certificatesresolvers.le.acme.email=${LETSENCRYPT_EMAIL:?Please supply LetsEncrypt with an email}
-            - --certificatesresolvers.le.acme.storage=/acme.json
+            - --certificatesresolvers.le.acme.storage=/le/acme.json
             - --certificatesresolvers.le.acme.tlschallenge=true
         labels:
             - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
@@ -183,408 +247,1401 @@ services:
         networks:
             - proxy
         ports:
-            - "${TRAEFIK_HTTP_PORT:-80}:80"
-            - "${TRAEFIK_HTTPS_PORT:-443}:443"
+            - "${TRAEFIK_HTTP_PORT:-80}:80" #HTTP
+            - "${TRAEFIK_HTTPS_PORT:-443}:443" #HTTPS
         volumes:
-            - ${SERVICES_ROOT}/${TRAEFIK_ROOT:-traefik}/acme.json:/acme.json
+            - ${SERVICES_ROOT}/${TRAEFIK_ROOT:-traefik}/le:/le
 
     ###############################
-    #           OpenLDAP          #
+    #           Jaeger            #
     ###############################
+    # jaeger-collector:
+    #     image: jaegertracing/jaeger-collector
+    #     command:
+    #         [
+    #             "--cassandra.keyspace=jaeger_v1_dc1",
+    #             "--cassandra.servers=cassandra",
+    #             "--collector.zipkin.http-port=9411",
+    #         ]
+    #     expose:
+    #         - "14269"
+    #         - "14268"
+    #         - "14250"
+    #         - "9411"
+    #     networks:
+    #         - jaeger
+    #     restart: unless-stopped
+    #     depends_on:
+    #         - cassandra-schema
 
-    openldap:
-        image: osixia/openldap:1.3.0
-        container_name: openldap
-        environment:
-            - LDAP_RFC2307BIS_SCHEMA=true
-            - KEEP_EXISTING_CONFIG=true
-            - LDAP_ORGANISATION
-            - LDAP_DOMAIN
-            - LDAP_ADMIN_PASSWORD
-            - LDAP_CONFIG_PASSWORD
-            - LDAP_BASE_DN=${LDAP_LOGIN_BASE}
-            - LDAP_READONLY_USER=true
-            - LDAP_READONLY_USER_USERNAME
-            - LDAP_READONLY_USER_PASSWORD
-            - TZ
-        tty: true
-        stdin_open: true
-        volumes:
-            - ${SERVICES_ROOT}/${OPENLDAP_ROOT:-openldap}/db:/var/lib/ldap
-            - ${SERVICES_ROOT}/${OPENLDAP_ROOT:-openldap}/config:/etc/ldap/slap.d
-        ports:
-            - "389:389"
-            - "636:636"
-        networks:
-            - proxy
-        command: --copy-service
+    # # frontend
+    # jaeger-query:
+    #     image: jaegertracing/jaeger-query
+    #     command:
+    #         [
+    #             "--cassandra.keyspace=jaeger_v1_dc1",
+    #             "--cassandra.servers=cassandra",
+    #         ]
+    #         # why 16687?
+    #     # ports:
+    #     #     - "16687"
+    #     restart: unless-stopped
+    #     networks:
+    #         - proxy
+    #         - jaeger
+    #     depends_on:
+    #         - cassandra-schema
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.jaeger.rule=Host(`${JAEGER_DOMAIN:?Domain for Jaeger must be set!}`)"
+    #         - "traefik.http.services.jaeger.loadbalancer.server.port=16686"
+    #         - "traefik.http.routers.jaeger.entrypoints=secure"
+    #         - "traefik.http.routers.jaeger.tls.certresolver=le"
 
-    ###############################
-    #    LDAP User Management     #
-    ###############################
+    # jaeger-agent:
+    #     image: jaegertracing/jaeger-agent
+    #     command: ["--reporter.grpc.host-port=jaeger-collector:14250"]
+    #     expose:
+    #         - "5775"
+    #         - "6831"
+    #         - "6832"
+    #         - "5778"
+    #     restart: unless-stopped
+    #     networks:
+    #         - jaeger
+    #     depends_on:
+    #         - jaeger-collector
 
-    ldapusermanagement:
-        image: wheelybird/ldap-user-manager
-        container_name: lum
-        environment:
-            - NO_HTTPS=TRUE
-            - LDAP_REQUIRE_STARTTLS=FALSE
-            - LDAP_URI=ldap://openldap 
-            - LDAP_ADMINS_GROUP=admins 
-            - SERVER_HOSTNAME=${LUM_DOMAIN} 
-            - LDAP_BASE_DN=${LDAP_LOGIN_BASE} 
-            - LDAP_ADMIN_BIND_DN=cn=admin,${LDAP_LOGIN_BASE} 
-            - LDAP_ADMIN_BIND_PWD=${LDAP_ADMIN_PASSWORD}
-            - TZ
-        depends_on:
-            - openldap
-        networks:
-            - proxy
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.lum.rule=Host(`${LUM_DOMAIN:?Domain for LDAPUserManager must be set!}`)"
-            - "traefik.http.routers.lum.entrypoints=secure"
-            - "traefik.http.routers.lum.tls.certresolver=le"
+    # cassandra:
+    #     image: cassandra:3.9
+    #     networks:
+    #         - jaeger
 
-    ###############################
-    #           Nextcloud         #
-    ###############################
+    # cassandra-schema:
+    #     image: jaegertracing/jaeger-cassandra-schema
+    #     networks:
+    #         - jaeger
+    #     depends_on:
+    #         - cassandra
 
-    nextcloud-server:
-        image: nginx:alpine
-        restart: unless-stopped
-        container_name: nextcloud-server
-        depends_on:
-            - nextcloud-data
-        volumes:
-            - nextcloud:/var/www/html:ro
-            - ./configs/nextcloud/nginx.conf:/etc/nginx/nginx.conf:ro
-        environment:
-            - TZ
-        networks:
-            - proxy
-            - nextcloud
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
-            - "traefik.http.middlewares.nextcloud-caldav.redirectregex.permanent=true"
-            - "traefik.http.middlewares.nextcloud-caldav.redirectregex.regex=^https://(.*)/.well-known/(card|cal)dav"
-            - "traefik.http.middlewares.nextcloud-caldav.redirectregex.replacement=https://$${1}/remote.php/dav/"
-            - "traefik.http.routers.nextcloud.middlewares=nextcloud-caldav@docker"
-            - "traefik.http.routers.nextcloud.entrypoints=secure"
-            - "traefik.http.routers.nextcloud.rule=Host(`${NEXTCLOUD_DOMAIN:?Domain for Nextcloud must be set!}`)"
-            - "traefik.http.routers.nextcloud.tls=true"
-            - "traefik.http.routers.nextcloud.tls.certresolver=le"
-
-    nextcloud-data:
-        image: nextcloud:18-fpm-alpine
-        restart: unless-stopped
-        container_name: nextcloud
-        networks:
-            - proxy
-            - nextcloud
-        depends_on:
-            - nextcloud-db
-            - nextcloud-cache
-        volumes:
-            - nextcloud:/var/www/html
-            # - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT}/data:/var/www/html/data
-            # - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT}/config:/var/www/html/config
-            # - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT}/custom_apps:/var/www/html/custom_apps
-            # - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT}/themes:/var/www/html/themes
-        environment:
-            - NEXTCLOUD_ADMIN_USER
-            - NEXTCLOUD_ADMIN_PASSWORD
-            - POSTGRES_USER=nextcloud
-            - POSTGRES_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
-            - POSTGRES_HOST=nextcloud-db
-            - POSTGRES_DB=nextcloud
-            - NEXTCLOUD_HOSTNAME=${NEXTCLOUD_DOMAIN}
-            - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_DOMAIN} localhost
-            # - NEXTCLOUD_LDAP_HOST=openldap
-            # - NEXTCLOUD_LDAP_AGENT_NAME=
-            - REDIS_HOST=nextcloud-cache
-            - SMTP_HOST=postfix
-            - SMTP_AUTH_TYPE=PLAIN
-            - MAIL_FROM_ADDRESS=${NEXTCLOUD_MAIL_USER:-noreply}@${NEXTCLOUD_DOMAIN}
-            - TZ
-
-    nextcloud-db:
-        image: postgres:12-alpine
-        container_name: nextcloud-db
-        restart: unless-stopped
-        networks:
-            - nextcloud
-        ports:
-            - "5432:5432"
-        environment:
-            - POSTGRES_DB=nextcloud
-            - POSTGRES_USER=nextcloud
-            - POSTGRES_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
-            - TZ
-        volumes:
-            - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT:-nextcloud}/db:/var/lib/postgresql/data
-
-    nextcloud-cache:
-        image: redis:alpine
-        container_name: nextcloud-cache
-        restart: unless-stopped
-        environment:
-            - TZ
-        networks:
-            - nextcloud
 
     ###############################
-    #           Emby              #
+    #           Freeipa           #
     ###############################
 
-    emby:
-        image: emby/embyserver:latest
-        container_name: emby
-        restart: unless-stopped
-        logging:
-            driver: "none"
-        networks:
-            - proxy
-        environment:
-            - TZ
-        volumes:
-            - ${SERVICES_ROOT}/${EMBY_ROOT:-emby}/media:/mnt/media:ro
-            - ${SERVICES_ROOT}/${EMBY_ROOT:-emby}/config:/config
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.services.emby.loadbalancer.server.port=8096"
-            - "traefik.http.routers.emby.rule=Host(`${EMBY_DOMAIN:?Domain for Emby must be set!}`)"
-            - "traefik.http.routers.emby.entrypoints=secure"
-            - "traefik.http.routers.emby.tls.certresolver=le"
-
-    ###############################
-    #           Jellyfin          #
-    ###############################
-
-    jellyfin:
-        image: jellyfin/jellyfin
-        container_name: jellyfin
-        restart: unless-stopped
-        networks:
-            - proxy
-        volumes:
-            - ${SERVICES_ROOT}/${JELLYFIN_ROOT:-jellyfin}/media:/mnt/media:ro
-            - ${SERVICES_ROOT}/${JELLYFIN_ROOT:-jellyfin}/config:/config
-        environment:
-            - TZ
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
-            - "traefik.http.routers.jellyfin.rule=Host(`${JELLYFIN_DOMAIN:?Domain for Jellyfin must be set!}`)"
-            - "traefik.http.routers.jellyfin.entrypoints=secure"
-            - "traefik.http.routers.jellyfin.tls.certresolver=le"
-
-    ###############################
-    #           Lychee            #
-    ###############################
-
-    lychee:
-        image: lycheeorg/lychee-laravel
-        container_name: lychee
-        restart: unless-stopped
-        depends_on: 
-            - lychee-db
-        networks:
-            - proxy
-            - lychee
-        volumes:
-            - ${SERVICES_ROOT}/${LYCHEE_ROOT:-lychee}/data:/data
-            - ${SERVICES_ROOT}/${LYCHEE_ROOT:-lychee}/conf:/conf
-            - ${SERVICES_ROOT}/${LYCHEE_ROOT:-lychee}/uploads:/uploads
-        environment:
-            - PHP_TZ=${TZ}
-            - PUID=${UID:-1000}
-            - PGID=${GID:-1000}
-            - APP_URL=${LYCHEE_DOMAIN}
-            - DB_CONNECTION=mysql
-            - DB_HOST=lychee-db
-            - DB_PORT=3306
-            - DB_DATABASE=lychee
-            - DB_USERNAME=lychee
-            - DB_PASSWORD=${LYCHEE_DB_PASSWORD}
-            - REDIS_HOST=lychee-cache
-            - REDIS_PORT=6379
-            - MAIL_DRIVER=smtp
-            - MAIL_HOST=postfix
-            - MAIL_PORT=1587
-            # - MAIL_USERNAME=null
-            # - MAIL_PASSWORD=null
-            # - MAIL_ENCRYPTION=null
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.lychee.rule=Host(`${LYCHEE_DOMAIN:?Domain for Lychee must be set!}`)"
-            - "traefik.http.routers.lychee.entrypoints=secure"
-            - "traefik.http.routers.lychee.tls.certresolver=le"
-
-    lychee-db:
-        image: mariadb:10.5
-        container_name: lychee-db
-        restart: unless-stopped
-        # expose:
-        #     - 3306
-        networks:
-            - lychee
-        environment:
-            - MYSQL_DATABASE=lychee
-            - MYSQL_USER=lychee
-            - MYSQL_PASSWORD=${LYCHEE_DB_PASSWORD}
-            - MYSQL_ROOT_PASSWORD=${LYCHEE_DB_ROOT_PASSWORD}
-        volumes:
-            - lychee-db:/var/lib/mysql/
-
-
-    lychee-cache:
-        image: redis:alpine
-        container_name: lychee-cache
-        environment:
-            - TZ
-        expose:
-            - 6379
-        restart: unless-stopped
-        networks:
-            - lychee
-
-    ###############################
-    #           Heimdall          #
-    ###############################
-
-    heimdall:
-        image: linuxserver/heimdall
-        container_name: heimdall
-        networks:
-            - proxy
-        environment:
-            - TZ
-        volumes:
-            - ${SERVICES_ROOT}/${HEIMDALL_ROOT:-heimdall}:/config
+    freeipa:
+        image: freeipa/freeipa-server
+        command:
+            [
+                "--realm=${ROOT_DOMAIN}",
+                "--ds-password=${LDAP_USER_PASSWORD}",
+                "--admin-password=${LDAP_ADMIN_PASSWORD}",
+                "-U",
+            ]
+        hostname: ${FREEIPA_DOMAIN}
+        container_name: freeipa
         restart: unless-stopped
         labels:
             - "traefik.enable=true"
-            - "traefik.http.routers.heimdall.rule=Host(`${HEIMDALL_DOMAIN:?Domain for Heimdall must be set!}`)"
-            - "traefik.http.routers.heimdall.entrypoints=secure"
-            - "traefik.http.routers.heimdall.tls.certresolver=le"
-
+            - "traefik.http.routers.freeipa.rule=Host(`${FREEIPA_DOMAIN:?Domain for Freeipa must be set!}`)"
+            - "traefik.http.routers.freeipa.entrypoints=secure"
+            - "traefik.http.routers.freeipa.tls.certresolver=le"
+        networks:
+            - proxy
+        volumes:
+            - ${SERVICES_ROOT}/${FREEIPA_ROOT:-freeipa}/db:/data
+            - ${SERVICES_ROOT}/${FREEIPA_ROOT:-freeipa}/logs:/var/logs
+            - /sys/fs/cgroup:/sys/fs/cgroup:ro
+        tmpfs:
+            - /run
+            - /var/cache
+            - /tmp
+    # ###############################
+    # #           Nextcloud         #
+    # ###############################
+    # nextcloud-server:
+    #     image: nginx:alpine
+    #     restart: unless-stopped
+    #     container_name: nextcloud-server
+    #     depends_on:
+    #         - nextcloud-data
+    #     volumes:
+    #         - nextcloud:/var/www/html:ro
+    #         - ./configs/nextcloud/nginx.conf:/etc/nginx/nginx.conf:ro
+    #     environment:
+    #         - TZ
+    #     networks:
+    #         - proxy
+    #         - nextcloud
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.services.nextcloud.loadbalancer.server.port=80"
+    #         - "traefik.http.middlewares.nextcloud-caldav.redirectregex.permanent=true"
+    #         - "traefik.http.middlewares.nextcloud-caldav.redirectregex.regex=^https://(.*)/.well-known/(card|cal)dav"
+    #         - "traefik.http.middlewares.nextcloud-caldav.redirectregex.replacement=https://$${1}/remote.php/dav/"
+    #         - "traefik.http.routers.nextcloud.middlewares=nextcloud-caldav@docker"
+    #         - "traefik.http.routers.nextcloud.entrypoints=secure"
+    #         - "traefik.http.routers.nextcloud.rule=Host(`${NEXTCLOUD_DOMAIN:?Domain for Nextcloud must be set!}`)"
+    #         - "traefik.http.routers.nextcloud.tls=true"
+    #         - "traefik.http.routers.nextcloud.tls.certresolver=le"
+    # nextcloud-data:
+    #     image: nextcloud:18-fpm-alpine
+    #     restart: unless-stopped
+    #     container_name: nextcloud
+    #     networks:
+    #         - proxy
+    #         - nextcloud
+    #     depends_on:
+    #         - nextcloud-db
+    #         - nextcloud-cache
+    #     volumes:
+    #         - nextcloud:/var/www/html
+    #         # - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT}/data:/var/www/html/data
+    #         # - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT}/config:/var/www/html/config
+    #         # - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT}/custom_apps:/var/www/html/custom_apps
+    #         # - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT}/themes:/var/www/html/themes
+    #     environment:
+    #         - NEXTCLOUD_ADMIN_USER
+    #         - NEXTCLOUD_ADMIN_PASSWORD
+    #         - POSTGRES_USER=nextcloud
+    #         - POSTGRES_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+    #         - POSTGRES_HOST=nextcloud-db
+    #         - POSTGRES_DB=nextcloud
+    #         - NEXTCLOUD_HOSTNAME=${NEXTCLOUD_DOMAIN}
+    #         - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_DOMAIN} localhost
+    #         # - NEXTCLOUD_LDAP_HOST=freeipa
+    #         # - NEXTCLOUD_LDAP_AGENT_NAME=
+    #         - REDIS_HOST=nextcloud-cache
+    #         - SMTP_HOST=${SMTP_HOST}
+    #         - SMTP_AUTH_TYPE=PLAIN
+    #         - MAIL_FROM_ADDRESS=${NEXTCLOUD_MAIL_USER:-nextcloud}@${ROOT_DOMAIN}
+    #         - TZ
+    # nextcloud-db:
+    #     image: postgres:12-alpine
+    #     container_name: nextcloud-db
+    #     restart: unless-stopped
+    #     networks:
+    #         - nextcloud
+    #     ports:
+    #         - "5432:5432"
+    #     environment:
+    #         - POSTGRES_DB=nextcloud
+    #         - POSTGRES_USER=nextcloud
+    #         - POSTGRES_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+    #         - TZ
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT:-nextcloud}/db:/var/lib/postgresql/data
+    # nextcloud-cache:
+    #     image: redis:alpine
+    #     container_name: nextcloud-cache
+    #     restart: unless-stopped
+    #     environment:
+    #         - TZ
+    #     networks:
+    #         - nextcloud
+    # ###############################
+    # #           Emby              #
+    # ###############################
+    # emby:
+    #     image: linuxserver/emby
+    #     container_name: emby
+    #     restart: unless-stopped
+    #     logging:
+    #         driver: "none"
+    #     networks:
+    #         - proxy
+    #     environment:
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - TZ
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${EMBY_ROOT:-emby}/media:/media:ro
+    #         - ${SERVICES_ROOT}/${EMBY_ROOT:-emby}/transcoding:/transcoding:ro
+    #         - ${SERVICES_ROOT}/${EMBY_ROOT:-emby}/config:/config
+    #     # device:
+    #     #     - /dev/dri:/dev/dri
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.services.emby.loadbalancer.server.port=8096"
+    #         - "traefik.http.routers.emby.rule=Host(`${EMBY_DOMAIN:?Domain for Emby must be set!}`)"
+    #         - "traefik.http.routers.emby.entrypoints=secure"
+    #         - "traefik.http.routers.emby.tls.certresolver=le"
+    # ###############################
+    # #           Jellyfin          #
+    # ###############################
+    # jellyfin:
+    #     image: jellyfin/jellyfin
+    #     container_name: jellyfin
+    #     restart: unless-stopped
+    #     networks:
+    #         - proxy
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${JELLYFIN_ROOT:-jellyfin}/media:/mnt/media:ro
+    #         - ${SERVICES_ROOT}/${JELLYFIN_ROOT:-jellyfin}/config:/config
+    #     environment:
+    #         - TZ
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.services.jellyfin.loadbalancer.server.port=8096"
+    #         - "traefik.http.routers.jellyfin.rule=Host(`${JELLYFIN_DOMAIN:?Domain for Jellyfin must be set!}`)"
+    #         - "traefik.http.routers.jellyfin.entrypoints=secure"
+    #         - "traefik.http.routers.jellyfin.tls.certresolver=le"
+    #
     ###############################
     #           Gitea             #
     ###############################
-
-    gitea:
-        image: gitea/gitea:1
-        container_name: gitea
-        depends_on:
-            - gitea-db
-        environment:
-            - DB_TYPE=postgres
-            - DB_HOST=gitea-db:5432
-            - DB_NAME=gitea
-            - DB_USER=gitea
-            - DB_PASSWD=${GITEA_DB_PASSWORD}
-            - TZ
-        restart: unless-stopped
-        networks:
-            - proxy
-            - gitea
-        volumes:
-            - ${SERVICES_ROOT}/${GITEA_ROOT:-gitea}/data:/data
-            - /etc/timezone:/etc/timezone:ro
-            - /etc/localtime:/etc/localtime:ro
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.gitea.rule=Host(`${GITEA_DOMAIN:?Domain for Gitea must be set!}`)"
-            - "traefik.http.services.gitea.loadbalancer.server.port=3000"
-            - "traefik.http.routers.gitea.entrypoints=secure"
-            - "traefik.http.routers.gitea.tls.certresolver=le"
-
-    gitea-db:
-        image: postgres:12-alpine
-        container_name: gitea-db
-        restart: unless-stopped
-        networks:
-            - gitea
-        environment:
-            - POSTGRES_DB=gitea
-            - POSTGRES_USER=gitea
-            - POSTGRES_PASSWORD=${GITEA_DB_PASSWORD}
-            - TZ
-        volumes:
-            - ${SERVICES_ROOT}/${GITEA_ROOT:-gitea}/db:/var/lib/postgresql/data
-
+    # gitea:
+    #     image: gitea/gitea:1
+    #     container_name: gitea
+    #     depends_on:
+    #         - gitea-db
+    #     environment:
+    #         - DB_TYPE=postgres
+    #         - DB_HOST=gitea-db:5432
+    #         - DB_NAME=gitea
+    #         - DB_USER=gitea
+    #         - DB_PASSWD=${GITEA_DB_PASSWORD}
+    #         - TZ
+    #     restart: unless-stopped
+    #     networks:
+    #         - proxy
+    #         - gitea
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${GITEA_ROOT:-gitea}/data:/data
+    # - ./configs/gitea:/data/gitea
+    #         - /etc/timezone:/etc/timezone:ro
+    #         - /etc/localtime:/etc/localtime:ro
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.gitea.rule=Host(`${GITEA_DOMAIN:?Domain for Gitea must be set!}`)"
+    #         - "traefik.http.services.gitea.loadbalancer.server.port=3000"
+    #         - "traefik.http.routers.gitea.entrypoints=secure"
+    #         - "traefik.http.routers.gitea.service=gitea-web-svc"
+    #         - "traefik.http.routers.gitea.tls.certresolver=le"
+    #         - "traefik.http.services.gitea-web-svc.loadbalancer.server.port=3000"
+    #         - "traefik.tcp.routers.gitea-ssh.rule=HostSNI(`*`)"
+    #         - "traefik.tcp.routers.gitea-ssh.entrypoints=ssh"
+    #         - "traefik.tcp.routers.gitea-ssh.service=gitea-ssh-svc"
+    #         - "traefik.tcp.services.gitea-ssh-svc.loadbalancer.server.port=22"
+    # gitea-db:
+    #     image: postgres:12-alpine
+    #     container_name: gitea-db
+    #     restart: unless-stopped
+    #     networks:
+    #         - gitea
+    #     environment:
+    #         - POSTGRES_DB=gitea
+    #         - POSTGRES_USER=gitea
+    #         - POSTGRES_PASSWORD=${GITEA_DB_PASSWORD}
+    #         - TZ
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${GITEA_ROOT:-gitea}/db:/var/lib/postgresql/data
+    # ###############################
+    # #         qBitorrent        #
+    # ###############################
+    # qbittorrent:
+    #     image: linuxserver/qbittorrent
+    #     container_name: qbittorrent
+    #     environment:
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - TZ
+    #         - UMASK_SET=022
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${QBITORRENT_ROOT:-qbitorrent}/config:/config
+    #         - ${SERVICES_ROOT}/${QBITORRENT_ROOT:-qbitorrent}/downloads:/downloads
+    #     ports:
+    #         - 6881:6881
+    #         - 6881:6881/udp
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.qbitorrent.rule=Host(`${QBITORRENT_DOMAIN:?Domain for qBitorrent must be set!}`)"
+    #         - "traefik.http.routers.qbitorrent.entrypoints=secure"
+    #         - "traefik.http.routers.qbitorrent.middlewares=authelia@docker"
+    #         - "traefik.http.routers.qbitorrent.tls.certresolver=le"
+    #     restart: unless-stopped
+    # ###############################
+    # #         Transmission        #
+    # ###############################
+    # transmission:
+    #     image: linuxserver/transmission
+    #     container_name: transmission
+    #     restart: unless-stopped
+    #     networks:
+    #         - proxy
+    #         - exporters
+    #     depends_on:
+    #         - traefik
+    #     environment:
+    #         - PUID=${UID:-1000}
+    #         - PGID=${GID:-1000}
+    #         - TZ
+    #     expose:
+    #         - 9091
+    #     ports:
+    #         - 51413:51413
+    #         - 51413:51413/udp
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/config:/config
+    #         - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/downloads/:/downloads
+    #         - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/torrentfiles:/watch
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.transmission.rule=Host(`${TRANSMISSION_DOMAIN:?Domain for Transmission must be set!}`)"
+    #         - "traefik.http.services.transmission.loadbalancer.server.port=9091"
+    #         - "traefik.http.routers.transmission.entrypoints=secure"
+    #         - "traefik.http.routers.transmission.middlewares=authelia@docker"
+    #         - "traefik.http.routers.transmission.tls.certresolver=le"
+    # transmission-exporter:
+    #     image: metalmatze/transmission-exporter
+    #     container_name: transmission-exporter
+    #     restart: always
+    #     networks:
+    #         - exporters
+    #     ports:
+    #         - "127.0.0.1:19091:19091"
+    #     environment:
+    #         TRANSMISSION_ADDR: http://transmission:9091
+    # ###############################
+    # #           Jenkins           #
+    # ###############################
+    # jenkins:
+    #     image: jenkins/jenkins:alpine
+    #     container_name: jenkins
+    #     restart: unless-stopped
+    #     environment:
+    #         - TZ
+    #     networks:
+    #         - proxy
+    #     volumes:
+    #         - jenkinsdata:/var/jenkins_home
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.jenkins.rule=Host(`${JENKINS_DOMAIN:?Domain for Jenkins must be set!}`)"
+    #         - "traefik.http.services.jenkins.loadbalancer.server.port=8080"
+    #         - "traefik.http.routers.jenkins.entrypoints=secure"
+    #         - "traefik.http.routers.jenkins.tls.certresolver=le"
     ###############################
-    #         Transmission        #
+    #           Portus            #
     ###############################
-
-    transmission:
-        image: linuxserver/transmission
-        container_name: transmission
-        restart: unless-stopped
-        networks:
-            - proxy
-        depends_on:
-            - traefik
-        environment:
-            - PUID=${UID:-1000}
-            - PGID=${GID:-1000}
-            - TZ
-        ports:
-            - 51413:51413
-            - 51413:51413/udp
-        volumes:
-            - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/config:/config
-            - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/downloads/:/downloads
-            - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/torrentfiles:/watch
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.transmission.rule=Host(`${TRANSMISSION_DOMAIN:?Domain for Transmission must be set!}`)"
-            - "traefik.http.services.transmission.loadbalancer.server.port=9091"
-            - "traefik.http.routers.transmission.entrypoints=secure"
-            # - "traefik.http.routers.transmission.middlewares=authelia@docker"
-            - "traefik.http.routers.transmission.tls.certresolver=le"
-
+    # portus:
+    #     image: opensuse/portus
+    #     container_name: portus
+    #     restart: unless-stopped
+    #     environment:
+    #         - PORTUS_CHECK_SSL_USAGE_ENABLED=false
+    #         - PORTUS_SECRET_KEY_BASE
+    #         - PORTUS_EMAIL_FROM
+    #         - PORTUS_EMAIL_NAME=Portus
+    #         - PORTUS_EMAIL_SMTP_ENABLED=true
+    #         - PORTUS_EMAIL_SMTP_ADDRESS=${SMTP_ADDRESS}
+    #         - PORTUS_EMAIL_SMTP_DOMAIN=${SMTP_DOMAIN}
+    #         - PORTUS_EMAIL_SMTP_PORT=${SMTP_PORT:-587}
+    #         - PORTUS_EMAIL_SMTP_USERNAME=${SMTP_USERNAME}
+    #         - PORTUS_EMAIL_SMTP_PASSWORD=${SMTP_PASSWORD}
+    #         - PORTUS_EMAIL_SMTP_AUTHENTICATION=${SMTP_AUTHENTICATION:-login}
+    #         - PORTUS_LDAP_ENABLED=true
+    #         - PORTUS_LDAP_HOSTNAME=freeipa
+    #         - PORTUS_LDAP_PORT=389
+    #         - PORTUS_LDAP_UID=uid
+    #         - PORTUS_LDAP_BASE=ou=users,${LDAP_LOGIN_BASE}
+    #         - PORTUS_LDAP_ADMIN_BASE=ou=admin,${LDAP_LOGIN_BASE}
+    #         - PORTUS_LDAP_GUESS_EMAIL_ENALBED=true
+    #         - PORTUS_LDAP_GUESS_EMAIL_ATTR=userEmail
+    #         - PORTUS_DB_HOST=portus-db
+    #         - PORTUS_DB_DATABASE=portus
+    #         - PORTUS_DB_USERNAME=portus
+    #         - PORTUS_DB_PASSWORD
+    #         - PORTUS_MACHINE_FQDN_VALUE=${PORTUS_DOMAIN}
+    #         - TZ
+    #     networks:
+    #         - proxy
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.portus.rule=Host(`${PORTUS_DOMAIN:?Domain for Portus must be set!}`)"
+    #         - "traefik.http.services.portus.loadbalancer.server.port=3000"
+    #         - "traefik.http.routers.portus.entrypoints=secure"
+    #         - "traefik.http.routers.portus.tls.certresolver=le"
+    # portus-db:
+    #     image: linuxserver/mariadb
+    #     container_name: portus-db
+    #     environment:
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - MYSQL_ROOT_PASSWORD=${PORTUS_DB_ADMIN_PASSWORD:?Admin password for portus-db must be set!}
+    #         - MYSQL_DATABASE=portus
+    #         - MYSQL_USER=portus
+    #         - MYSQL_PASSWORD=${PORTUS_DB_PASSWORD:?User password for portus must be set!}
+    #         - TZ
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${PORTUS_ROOT:-portus}/db:/config
+    #     networks:
+    #         - portus
+    #     restart: unless-stopped
     ###############################
-    #           Jenkins           #
+    #           Bookstack         #
     ###############################
-
-    jenkins:
-        image: jenkins/jenkins:alpine
-        container_name: jenkins
-        restart: unless-stopped
-        environment:
-            - TZ
-        networks:
-            - proxy
-        volumes:
-            - jenkinsdata:/var/jenkins_home
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.jenkins.rule=Host(`${JENKINS_DOMAIN:?Domain for Jenkins must be set!}`)"
-            - "traefik.http.services.jenkins.loadbalancer.server.port=8080"
-            - "traefik.http.routers.jenkins.entrypoints=secure"
-            - "traefik.http.routers.jenkins.tls.certresolver=le"
-    
-    ##############################
-    #          Postfix           #
-    ##############################
-
-    postfix:
-        image: boky/postfix
-        container_name: postfix
-        restart: unless-stopped
-        ports:
-            - "1587:587"
-        environment:
-            - ALLOWED_SENDER_DOMAINS=${POSTFIX_ALLOWED_DOMAINS}
-            - MESSAGE_SIZE_LIMIT=26214400
-            - TZ
-        networks:
-            - proxy
-        volumes:
-            - ${SERVICES_ROOT}/${POSTFIX_ROOT:-postfix}/keys:/etc/opendkim/keys
-
-
-    
+    # bookstack:
+    #     image: linuxserver/bookstack
+    #     container_name: bookstack
+    #     environment:
+    #         # - APP_DEBUG=true
+    #         # - LDAP_DUMP_USER_DETAILS=true
+    #         - APP_URL=https://${BOOKSTACK_DOMAIN}
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - DB_HOST=bookstack-db
+    #         - DB_USER=bookstack
+    #         - DB_PASS=${BOOKSTACK_DB_PASSWORD}
+    #         - DB_DATABASE=bookstackapp
+    #         - AUTH_METHOD=ldap
+    #         - LDAP_SERVER=freeipa
+    #         - LDAP_BASE_DN=ou=people,${LDAP_LOGIN_BASE}
+    #         - LDAP_DN=cn=admin,${LDAP_LOGIN_BASE}
+    #         - LDAP_PASS=${LDAP_ADMIN_PASSWORD}
+    #         - LDAP_USER_FILTER=(&(uid=$${user}))
+    #         - LDAP_VERSION=3
+    #         - LDAP_ID_ATTRIBUTE=uid
+    #         - LDAP_EMAIL_ATTRIBUTE=mail
+    #         - LDAP_DISPLAY_NAME_ATTRIBUTE=cn
+    #         - LDAP_TLS_INSECURE=true
+    #         - CACHE_DRIVER=redis
+    #         - SESSION_DRIVER=redis
+    #         - REDIS_SERVERS=bookstack-cache:6379:0
+    #     volumes:
+    #         - bookstack:/config
+    #     restart: unless-stopped
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.bookstack.rule=Host(`${BOOKSTACK_DOMAIN:?Domain for Bookstack must be set!}`)"
+    #         - "traefik.http.routers.bookstack.entrypoints=secure"
+    #         - "traefik.http.routers.bookstack.tls.certresolver=le"
+    #     networks:
+    #         - proxy
+    #         - bookstack
+    #     depends_on:
+    #         - bookstack-db
+    # bookstack-db:
+    #     image: linuxserver/mariadb
+    #     container_name: bookstack-db
+    #     environment:
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - MYSQL_ROOT_PASSWORD=${BOOKSTACK_DB_ADMIN_PASSWORD:?Admin password for bookstack-db must be set!}
+    #         - MYSQL_DATABASE=bookstackapp
+    #         - MYSQL_USER=bookstack
+    #         - MYSQL_PASSWORD=${BOOKSTACK_DB_PASSWORD:?User password for bookstack must be set!}
+    #         - TZ
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${BOOKSTACK_ROOT:-bookstack}/db:/config
+    #     networks:
+    #         - bookstack
+    #     restart: unless-stopped
+    # bookstack-cache:
+    #     image: redis:alpine
+    #     container_name: bookstack-cache
+    #     environment:
+    #         - TZ
+    #     restart: unless-stopped
+    #     networks:
+    #         - bookstack
+    ###############################
+    #           Organizr          #
+    ###############################
+    # organizr:
+    #     image: linuxserver/organizr
+    #     container_name: organizr
+    #     environment:
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - TZ
+    #     networks:
+    #         - proxy
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.organizr.rule=Host(`${ORGANIZR_DOMAIN:?Domain for Organizr must be set!}`)"
+    #         - "traefik.http.routers.organizr.entrypoints=secure"
+    #         - "traefik.http.routers.organizr.tls.certresolver=le"
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${ORGANIZR_ROOT:-organizr}:/config
+    #     restart: unless-stopped
+    # ###############################
+    # #           Muximux          #
+    # ###############################
+    # muximux:
+    #     image: linuxserver/muximux
+    #     container_name: muximux
+    #     environment:
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - TZ
+    #     networks:
+    #         - proxy
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.muximux.rule=Host(`${MUXIMUX_DOMAIN:?Domain for Muximux must be set!}`)"
+    #         - "traefik.http.routers.muximux.entrypoints=secure"
+    #         - "traefik.http.routers.muximux.tls.certresolver=le"
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${MUXIMUX_ROOT:-muximux}:/config
+    #     restart: unless-stopped
+    ###############################
+    #           Ombi              #
+    ###############################
+    # ombi:
+    #     image: linuxserver/ombi
+    #     container_name: ombi
+    #     networks:
+    #         - proxy
+    #     environment:
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - TZD
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.ombi.rule=Host(`${OMBI_DOMAIN:?Domain for Ombi must be set!}`)"
+    #         - "traefik.http.routers.ombi.entrypoints=secure"
+    #         - "traefik.http.routers.ombi.tls.certresolver=le"
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${OMBI_ROOT:-ombi}:/config
+    #     restart: unless-stopped
+    ###############################
+    #           Mastadon          #
+    ###############################
+    # web: #3000
+    #     build: .
+    #     image: tootsuite/mastodon
+    #     restart: always
+    #     command: bash -c "rm -f /mastodon/tmp/pids/server.pid; bundle exec rails s -p 3000"
+    #     networks:
+    #         - proxy
+    #         - mastadon
+    #     depends_on:
+    #         - mastadon-db
+    #         - mastadon-cache
+    #         - mastadon-search
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${MASTADON_ROOT:-mastadon}/public/system:/mastodon/public/system
+    # streaming: #4000
+    #     build: .
+    #     image: tootsuite/mastodon
+    #     restart: always
+    #     command: node ./streaming
+    #     networks:
+    #         - proxy
+    #         - mastadon
+    #     depends_on:
+    #         - mastadon-db
+    #         - mastadon-cache
+    # mastadon-db:
+    #     restart: always
+    #     image: postgres:9.6-alpine
+    #     networks:
+    #         - mastadon
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${MASTADON_ROOT:-mastadon}/db:/var/lib/postgresql/data
+    # mastadon-cache:
+    #     restart: always
+    #     image: redis:5.0-alpine
+    #     networks:
+    #         - mastadon
+    # mastadon-search:
+    #     restart: always
+    #     image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.1.3
+    #     environment:
+    #         - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    #     networks:
+    #         - mastadon
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${MASTADON_ROOT:-mastadon}/elasticsearch:/usr/share/elasticsearch/data
+    # sidekiq:
+    #     build: .
+    #     image: tootsuite/mastodon
+    #     restart: always
+    #     command: bundle exec sidekiq
+    #     depends_on:
+    #         - mastadon-db
+    #         - mastadon-cache
+    #     networks:
+    #         - proxy
+    #         - mastadon
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${MASTADON_ROOT:-mastadon}/public/system:/mastodon/public/system
+    # ## Uncomment to enable federation with tor instances along with adding the following ENV variables
+    # ## http_proxy=http://privoxy:8118
+    # ## ALLOW_ACCESS_TO_HIDDEN_SERVICE=true
+    # tor:
+    #     image: sirboops/tor
+    #     networks:
+    #         - proxy
+    #         - mastadon
+    # privoxy:
+    #     image: sirboops/privoxy
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${MASTADON_ROOT:-mastadon}/priv-config:/opt/config
+    #     networks:
+    #         - proxy
+    #         - mastadon
+    ###############################
+    #           Friendica         #
+    ###############################
+    # friendica:
+    #     image: friendica:fpm
+    #     restart: always
+    #     volumes:
+    #         - friendica:/var/www/html
+    #     environment:
+    #         - MYSQL_HOST=friendica-db
+    #         - MYSQL_USER=friendica
+    #         - MYSQL_PASSWORD=${FRIENDICA_DB_PASSWORD}
+    #         - MYSQL_DATABASE=friendica
+    #         - FRIENDICA_ADMIN_MAIL=friendica@${ROOT_DOMAIN}
+    #     networks:
+    #         - proxy
+    #         - default
+    # friendica-web:
+    #     image: nginx
+    #     volumes:
+    #         - ./configs/friendica/nginx.conf:/etc/nginx/nginx.conf:ro
+    #         - friendica:/var/www/html:ro
+    #     restart: always
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.friendica.rule=Host(`${FRIENDICA_DOMAIN:?Domain for Friendica must be set!}`)"
+    #         - "traefik.http.routers.friendica.entrypoints=secure"
+    #         - "traefik.http.routers.friendica.tls.certresolver=le"
+    #     networks:
+    #         - proxy
+    #         - friendica
+    # friendica-db:
+    #     image: linuxserver/mariadb
+    #     restart: always
+    #     networks:
+    #         - friendica
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${FRIENDICA_ROOT:-friendica}/db:/var/lib/mysql
+    #     environment:
+    #         - MYSQL_USER=friendica
+    #         - MYSQL_PASSWORD=${FRIENDICA_DB_PASSWORD}
+    #         - MYSQL_DATABASE=friendica
+    #         - MYSQL_ROOT_PASSWORD=${FRIENDICA_DB_ADMIN_PASSWORD:?Admin password for friendica-db must be set!}
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - TZ
+    ###############################
+    #        Calibre-web          #
+    ###############################
+    # calibre-web:
+    #     image: linuxserver/calibre-web
+    #     container_name: calibre-web
+    #     networks:
+    #         - proxy
+    #     environment:
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - TZ
+    #         - DOCKER_MODS=linuxserver/calibre-web:calibre
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.calibre.rule=Host(`${CALIBRE_DOMAIN:?Domain for Calibre-web must be set!}`)"
+    #         - "traefik.http.routers.calibre.entrypoints=secure"
+    #         - "traefik.http.services.calibre.loadbalancer.server.port=8083"
+    #         - "traefik.http.routers.calibre.tls.certresolver=le"
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${CALIBRE_ROOT:-calibre}/data:/config
+    #         - ${SERVICES_ROOT}/${CALIBRE_ROOT:-calibre}/books:/books
+    #     restart: unless-stopped
+    ###############################
+    #        Airsonic .           #
+    ###############################
+    # airsonic:
+    #     image: linuxserver/airsonic
+    #     container_name: airsonic
+    #     networks:
+    #         - proxy
+    #     environment:
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - TZ
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.airsonic.rule=Host(`${AIRSONIC_DOMAIN:?Domain for Airsonic must be set!}`)"
+    #         - "traefik.http.routers.airsonic.entrypoints=secure"
+    #         - "traefik.http.services.airsonic.loadbalancer.server.port=4040"
+    #         - "traefik.http.routers.airsonic.tls.certresolver=le"
+    #     volumes:
+    #         - ./configs/airsonic/airsonic.properties:/var/lib/docker/volumes/data/_data/airsonic.properties
+    #         - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/config:/config
+    #         - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/music:/music
+    #         - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/playlists:/playlists
+    #         - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/podcasts:/podcasts
+    #         - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/media:/media
+    #     restart: unless-stopped
+    ###############################
+    #           Wekan             #
+    ###############################
+    # wekan-db:
+    #     image: mongo:latest
+    #     container_name: wekan-db
+    #     restart: always
+    #     command: mongod --oplogSize 128
+    #     networks:
+    #         - proxy
+    #         - wekan
+    #     expose:
+    #         - 27017
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${WEKAN_ROOT:-wekan}/db:/data/db
+    #         - ${SERVICES_ROOT}/${WEKAN_ROOT:-wekan}/db-dump:/dump
+    # wekan:
+    #     image: wekanteam/wekan
+    #     container_name: wekan-app
+    #     restart: always
+    #     networks:
+    #         - wekan
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.wekan.rule=Host(`${WEKAN_DOMAIN:?Domain for Wekan must be set!}`)"
+    #         - "traefik.http.routers.wekan.entrypoints=secure"
+    #         - "traefik.http.services.wekan.loadbalancer.server.port=8080"
+    #         - "traefik.http.routers.wekan.tls.certresolver=le"
+    #     environment:
+    #         #- DEBUG=true
+    #         - MONGO_URL=mongodb://wekan-db:27017/wekan
+    #         - ROOT_URL=https://${WEKAN_DOMAIN}
+    #         # - MAIL_URL=smtp://<mail_url>:25/?ignoreTLS=true&tls={rejectUnauthorized:false}
+    #         # - MAIL_FROM=Wekan Notifications <noreply.wekan@${ROOT_DOMAIN}>
+    #         - WITH_API=true
+    #         - RICHER_CARD_COMMENT_EDITOR=true
+    #         - SCROLLINERTIA=0
+    #         - SCROLLAMOUNT=auto
+    #         - CARD_OPENED_WEBHOOK_ENABLED=false
+    #         - CORS=*
+    #         - CORS_ALLOW_HEADERS=Authorization,Content-Type
+    #         - CORS_EXPOSE_HEADERS=*
+    #         - BROWSER_POLICY_ENABLED=true
+    #         - WEBHOOKS_ATTRIBUTES=cardId,listId,oldListId,boardId,comment,user,card,commentId
+    #         - DEFAULT_AUTHENTICATION_METHOD=ldap
+    #         - LDAP_ENABLE=true
+    #         - LDAP_PORT=389
+    #         - LDAP_HOST=freeipa
+    #         - LDAP_BASEDN=${LDAP_LOGIN_BASE}
+    #         - LDAP_LOGIN_FALLBACK=false
+    #         - LDAP_RECONNECT=true
+    #         - LDAP_TIMEOUT=10000
+    #         - LDAP_IDLE_TIMEOUT=10000
+    #         - LDAP_CONNECT_TIMEOUT=10000
+    #         - LDAP_AUTHENTIFICATION=true
+    #         - LDAP_AUTHENTIFICATION_USERDN=dc=admin,${LDAP_LOGIN_BASE}
+    #         - LDAP_AUTHENTIFICATION_PASSWORD=${LDAP_ADMIN_PASSWORD}
+    #         - LDAP_LOG_ENABLED=true
+    #         - LDAP_BACKGROUND_SYNC=false
+    #         - LDAP_BACKGROUND_SYNC_INTERVAL='every 1 hour'
+    #         - LDAP_BACKGROUND_SYNC_KEEP_EXISTANT_USERS_UPDATED=false
+    #         - LDAP_BACKGROUND_SYNC_IMPORT_NEW_USERS=false
+    #         - LDAP_ENCRYPTION=false
+    #         - LDAP_USER_AUTHENTICATION_FIELD="uid"
+    #         - LDAP_USER_SEARCH_FIELD=uid
+    #         - LDAP_USERNAME_FIELD=displayLamd
+    #         - LDAP_FULLNAME_FIELD=cn
+    #     depends_on:
+    #         - wekan-db
+    ###############################
+    #           Bitwarden         #
+    ###############################
+    # bitwarden-db:
+    #     image: bitwarden/mssql:latest
+    #     container_name: bitwarden-mssql
+    #     restart: always
+    #     stop_grace_period: 60s
+    #     volumes:
+    #         - ../mssql/data:/var/opt/mssql/data
+    #         - ../logs/mssql:/var/opt/mssql/log
+    #         - ../mssql/backups:/etc/bitwarden/mssql/backups
+    # bitwarden-web:
+    #     image: bitwarden/web:latest
+    #     container_name: bitwarden-web
+    #     restart: always
+    #     volumes:
+    #         - ../web:/etc/bitwarden/web
+    # bitwarden-attachments:
+    #     image: bitwarden/attachments:latest
+    #     container_name: bitwarden-attachments
+    #     restart: always
+    #     volumes:
+    #         - ../core/attachments:/etc/bitwarden/core/attachments
+    # bitwarden-api:
+    #     image: bitwarden/api:latest
+    #     container_name: bitwarden-api
+    #     restart: always
+    #     volumes:
+    #         - ../core:/etc/bitwarden/core
+    #         - ../ca-certificates:/etc/bitwarden/ca-certificates
+    #         - ../logs/api:/etc/bitwarden/logs
+    #     networks:
+    #         - default
+    #         - public
+    # bitwarden-identity:
+    #     image: bitwarden/identity:latest
+    #     container_name: bitwarden-identity
+    #     restart: always
+    #     volumes:
+    #         - ../identity:/etc/bitwarden/identity
+    #         - ../core:/etc/bitwarden/core
+    #         - ../ca-certificates:/etc/bitwarden/ca-certificates
+    #         - ../logs/identity:/etc/bitwarden/logs
+    #     networks:
+    #         - default
+    #         - public
+    # bitwarden-admin:
+    #     image: bitwarden/admin:latest
+    #     container_name: bitwarden-admin
+    #     restart: always
+    #     depends_on:
+    #         - mssql
+    #     volumes:
+    #         - ../core:/etc/bitwarden/core
+    #         - ../ca-certificates:/etc/bitwarden/ca-certificates
+    #         - ../logs/admin:/etc/bitwarden/logs
+    #     networks:
+    #         - default
+    #         - public
+    # bitwarden-icons:
+    #     image: bitwarden/icons:latest
+    #     container_name: bitwarden-icons
+    #     restart: always
+    #     volumes:
+    #         - ../ca-certificates:/etc/bitwarden/ca-certificates
+    #         - ../logs/icons:/etc/bitwarden/logs
+    #     networks:
+    #         - default
+    #         - public
+    # bitwarden-notifications:
+    #     image: bitwarden/notifications:latest
+    #     container_name: bitwarden-notifications
+    #     restart: always
+    #     volumes:
+    #         - ../ca-certificates:/etc/bitwarden/ca-certificates
+    #         - ../logs/notifications:/etc/bitwarden/logs
+    #     networks:
+    #         - default
+    #         - public
+    # bitwarden-events:
+    #     image: bitwarden/events:latest
+    #     container_name: bitwarden-events
+    #     restart: always
+    #     volumes:
+    #         - ../ca-certificates:/etc/bitwarden/ca-certificates
+    #         - ../logs/events:/etc/bitwarden/logs
+    #     networks:
+    #         - default
+    #         - public
+    ###############################
+    #           Mailcow           #
+    ###############################
+    # unbound-mailcow:
+    #   image: mailcow/unbound:1.10
+    #   environment:
+    #     - TZ
+    #   volumes:
+    #     - ./data/hooks/unbound:/hooks
+    #     - ./data/conf/unbound/unbound.conf:/etc/unbound/unbound.conf:ro
+    #   restart: always
+    #   tty: true
+    #   networks:
+    #     mailcow-network:
+    #       ipv4_address: ${IPV4_NETWORK:-172.22.1}.254
+    #       aliases:
+    #         - unbound
+    # mysql-mailcow:
+    #   image: mariadb:10.3
+    #   depends_on:
+    #     - unbound-mailcow
+    #   stop_grace_period: 45s
+    #   volumes:
+    #     - mysql-vol-1:/var/lib/mysql/
+    #     - mysql-socket-vol-1:/var/run/mysqld/
+    #     - ./data/conf/mysql/:/etc/mysql/conf.d/:ro
+    #   environment:
+    #     - TZ
+    #     - MYSQL_ROOT_PASSWORD=${DBROOT}
+    #     - MYSQL_DATABASE=${DBNAME}
+    #     - MYSQL_USER=${DBUSER}
+    #     - MYSQL_PASSWORD=${DBPASS}
+    #     - MYSQL_INITDB_SKIP_TZINFO=1
+    #   restart: always
+    #   ports:
+    #     - "${SQL_PORT:-127.0.0.1:13306}:3306"
+    #   networks:
+    #     mailcow-network:
+    #       aliases:
+    #         - mysql
+    # redis-mailcow:
+    #   image: redis:5-alpine
+    #   volumes:
+    #     - redis-vol-1:/data/
+    #   restart: always
+    #   ports:
+    #     - "${REDIS_PORT:-127.0.0.1:7654}:6379"
+    #   environment:
+    #     - TZ
+    #   networks:
+    #     mailcow-network:
+    #       ipv4_address: ${IPV4_NETWORK:-172.22.1}.249
+    #       aliases:
+    #         - redis
+    # clamd-mailcow:
+    #   image: mailcow/clamd:1.35
+    #   restart: always
+    #   dns:
+    #     - ${IPV4_NETWORK:-172.22.1}.254
+    #   environment:
+    #     - TZ
+    #     - SKIP_CLAMD=${SKIP_CLAMD:-n}
+    #   volumes:
+    #     - ./data/conf/clamav/:/etc/clamav/
+    #   networks:
+    #     mailcow-network:
+    #       aliases:
+    #         - clamd
+    # rspamd-mailcow:
+    #   image: mailcow/rspamd:1.67
+    #   stop_grace_period: 30s
+    #   depends_on:
+    #     - nginx-mailcow
+    #     - dovecot-mailcow
+    #   environment:
+    #     - TZ
+    #     - IPV4_NETWORK=${IPV4_NETWORK:-172.22.1}
+    #     - IPV6_NETWORK=${IPV6_NETWORK:-fd4d:6169:6c63:6f77::/64}
+    #     - REDIS_SLAVEOF_IP=${REDIS_SLAVEOF_IP:-}
+    #     - REDIS_SLAVEOF_PORT=${REDIS_SLAVEOF_PORT:-}
+    #   volumes:
+    #     - ./data/hooks/rspamd:/hooks
+    #     - ./data/conf/rspamd/custom/:/etc/rspamd/custom
+    #     - ./data/conf/rspamd/override.d/:/etc/rspamd/override.d
+    #     - ./data/conf/rspamd/local.d/:/etc/rspamd/local.d
+    #     - ./data/conf/rspamd/plugins.d/:/etc/rspamd/plugins.d
+    #     - ./data/conf/rspamd/lua/:/etc/rspamd/lua/:ro
+    #     - ./data/conf/rspamd/rspamd.conf.local:/etc/rspamd/rspamd.conf.local
+    #     - ./data/conf/rspamd/rspamd.conf.override:/etc/rspamd/rspamd.conf.override
+    #     - rspamd-vol-1:/var/lib/rspamd
+    #   restart: always
+    #   dns:
+    #     - ${IPV4_NETWORK:-172.22.1}.254
+    #   hostname: rspamd
+    #   networks:
+    #     mailcow-network:
+    #       aliases:
+    #         - rspamd
+    # php-fpm-mailcow:
+    #   image: mailcow/phpfpm:1.58
+    #   command: "php-fpm -d date.timezone -d expose_php=0"
+    #   depends_on:
+    #     - redis-mailcow
+    #   volumes:
+    #     - ./data/hooks/phpfpm:/hooks
+    #     - ./data/web:/web:rw
+    #     - ./data/conf/rspamd/dynmaps:/dynmaps:ro
+    #     - ./data/conf/rspamd/custom/:/rspamd_custom_maps
+    #     - rspamd-vol-1:/var/lib/rspamd
+    #     - mysql-socket-vol-1:/var/run/mysqld/
+    #     - ./data/conf/sogo/:/etc/sogo/
+    #     - ./data/conf/rspamd/meta_exporter:/meta_exporter:ro
+    #     - ./data/conf/phpfpm/sogo-sso/:/etc/sogo-sso/
+    #     - ./data/conf/phpfpm/php-fpm.d/pools.conf:/usr/local/etc/php-fpm.d/z-pools.conf
+    #     - ./data/conf/phpfpm/php-conf.d/opcache-recommended.ini:/usr/local/etc/php/conf.d/opcache-recommended.ini
+    #     - ./data/conf/phpfpm/php-conf.d/upload.ini:/usr/local/etc/php/conf.d/upload.ini
+    #     - ./data/conf/phpfpm/php-conf.d/other.ini:/usr/local/etc/php/conf.d/zzz-other.ini
+    #     - ./data/conf/dovecot/global_sieve_before:/global_sieve/before
+    #     - ./data/conf/dovecot/global_sieve_after:/global_sieve/after
+    #     - ./data/assets/templates:/tpls
+    #   dns:
+    #     - ${IPV4_NETWORK:-172.22.1}.254
+    #   environment:
+    #     - REDIS_SLAVEOF_IP=${REDIS_SLAVEOF_IP:-}
+    #     - REDIS_SLAVEOF_PORT=${REDIS_SLAVEOF_PORT:-}
+    #     - LOG_LINES=${LOG_LINES:-9999}
+    #     - TZ
+    #     - DBNAME=${DBNAME}
+    #     - DBUSER=${DBUSER}
+    #     - DBPASS=${DBPASS}
+    #     - MAILCOW_HOSTNAME=${MAILCOW_HOSTNAME}
+    #     - IMAP_PORT=${IMAP_PORT:-143}
+    #     - IMAPS_PORT=${IMAPS_PORT:-993}
+    #     - POP_PORT=${POP_PORT:-110}
+    #     - POPS_PORT=${POPS_PORT:-995}
+    #     - SIEVE_PORT=${SIEVE_PORT:-4190}
+    #     - SUBMISSION_PORT=${SUBMISSION_PORT:-587}
+    #     - SMTPS_PORT=${SMTPS_PORT:-465}
+    #     - SMTP_PORT=${SMTP_PORT:-25}
+    #     - API_KEY=${API_KEY:-invalid}
+    #     - API_ALLOW_FROM=${API_ALLOW_FROM:-invalid}
+    #     - COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME:-mailcow-dockerized}
+    #     - SKIP_SOLR=${SKIP_SOLR:-y}
+    #     - SKIP_CLAMD=${SKIP_CLAMD:-n}
+    #     - ALLOW_ADMIN_EMAIL_LOGIN=${ALLOW_ADMIN_EMAIL_LOGIN:-n}
+    #     - MASTER=${MASTER:-y}
+    #   restart: always
+    #   networks:
+    #     mailcow-network:
+    #       aliases:
+    #         - phpfpm
+    # sogo-mailcow:
+    #   image: mailcow/sogo:1.73
+    #   environment:
+    #     - DBNAME=${DBNAME}
+    #     - DBUSER=${DBUSER}
+    #     - DBPASS=${DBPASS}
+    #     - TZ
+    #     - LOG_LINES=${LOG_LINES:-9999}
+    #     - MAILCOW_HOSTNAME=${MAILCOW_HOSTNAME}
+    #     - ACL_ANYONE=${ACL_ANYONE:-disallow}
+    #     - ALLOW_ADMIN_EMAIL_LOGIN=${ALLOW_ADMIN_EMAIL_LOGIN:-n}
+    #     - IPV4_NETWORK=${IPV4_NETWORK:-172.22.1}
+    #     - SOGO_EXPIRE_SESSION=${SOGO_EXPIRE_SESSION:-480}
+    #     - MASTER=${MASTER:-y}
+    #     - REDIS_SLAVEOF_IP=${REDIS_SLAVEOF_IP:-}
+    #     - REDIS_SLAVEOF_PORT=${REDIS_SLAVEOF_PORT:-}
+    #   dns:
+    #     - ${IPV4_NETWORK:-172.22.1}.254
+    #   volumes:
+    #     - ./data/conf/sogo/:/etc/sogo/
+    #     - ./data/web/inc/init_db.inc.php:/init_db.inc.php
+    #     - ./data/conf/sogo/custom-sogo.js:/usr/lib/GNUstep/SOGo/WebServerResources/js/custom-sogo.js
+    #     - mysql-socket-vol-1:/var/run/mysqld/
+    #     - sogo-web-vol-1:/sogo_web
+    #     - sogo-userdata-backup-vol-1:/sogo_backup
+    #   restart: always
+    #   networks:
+    #     mailcow-network:
+    #       ipv4_address: ${IPV4_NETWORK:-172.22.1}.248
+    #       aliases:
+    #         - sogo
+    # dovecot-mailcow:
+    #   image: mailcow/dovecot:1.117
+    #   depends_on:
+    #     - mysql-mailcow
+    #   dns:
+    #     - ${IPV4_NETWORK:-172.22.1}.254
+    #   cap_add:
+    #     - NET_BIND_SERVICE
+    #   volumes:
+    #     - ./data/hooks/dovecot:/hooks
+    #     - ./data/conf/dovecot:/etc/dovecot
+    #     - ./data/assets/ssl:/etc/ssl/mail/:ro
+    #     - ./data/conf/sogo/:/etc/sogo/
+    #     - ./data/conf/phpfpm/sogo-sso/:/etc/phpfpm/
+    #     - vmail-vol-1:/var/vmail
+    #     - vmail-attachments-vol-1:/var/attachments
+    #     - crypt-vol-1:/mail_crypt/
+    #     - ./data/conf/rspamd/custom/:/etc/rspamd/custom
+    #     - ./data/assets/templates:/templates
+    #     - rspamd-vol-1:/var/lib/rspamd
+    #     - mysql-socket-vol-1:/var/run/mysqld/
+    #   environment:
+    #     - LOG_LINES=${LOG_LINES:-9999}
+    #     - DBNAME=${DBNAME}
+    #     - DBUSER=${DBUSER}
+    #     - DBPASS=${DBPASS}
+    #     - TZ
+    #     - MAILCOW_HOSTNAME=${MAILCOW_HOSTNAME}
+    #     - IPV4_NETWORK=${IPV4_NETWORK:-172.22.1}
+    #     - ALLOW_ADMIN_EMAIL_LOGIN=${ALLOW_ADMIN_EMAIL_LOGIN:-n}
+    #     - MAILDIR_GC_TIME=${MAILDIR_GC_TIME:-1440}
+    #     - ACL_ANYONE=${ACL_ANYONE:-disallow}
+    #     - SKIP_SOLR=${SKIP_SOLR:-y}
+    #     - MAILDIR_SUB=${MAILDIR_SUB:-}
+    #     - MASTER=${MASTER:-y}
+    #     - REDIS_SLAVEOF_IP=${REDIS_SLAVEOF_IP:-}
+    #     - REDIS_SLAVEOF_PORT=${REDIS_SLAVEOF_PORT:-}
+    #   ports:
+    #     - "${DOVEADM_PORT:-127.0.0.1:19991}:12345"
+    #     - "${IMAP_PORT:-143}:143"
+    #     - "${IMAPS_PORT:-993}:993"
+    #     - "${POP_PORT:-110}:110"
+    #     - "${POPS_PORT:-995}:995"
+    #     - "${SIEVE_PORT:-4190}:4190"
+    #   restart: always
+    #   tty: true
+    #   ulimits:
+    #     nproc: 65535
+    #     nofile:
+    #       soft: 20000
+    #       hard: 40000
+    #   hostname: ${MAILCOW_HOSTNAME}
+    #   networks:
+    #     mailcow-network:
+    #       ipv4_address: ${IPV4_NETWORK:-172.22.1}.250
+    #       aliases:
+    #         - dovecot
+    # postfix-mailcow:
+    #   image: mailcow/postfix:1.47
+    #   depends_on:
+    #     - mysql-mailcow
+    #   volumes:
+    #     - ./data/hooks/postfix:/hooks
+    #     - ./data/conf/postfix:/opt/postfix/conf
+    #     - ./data/assets/ssl:/etc/ssl/mail/:ro
+    #     - postfix-vol-1:/var/spool/postfix
+    #     - crypt-vol-1:/var/lib/zeyple
+    #     - rspamd-vol-1:/var/lib/rspamd
+    #     - mysql-socket-vol-1:/var/run/mysqld/
+    #   environment:
+    #     - LOG_LINES=${LOG_LINES:-9999}
+    #     - TZ
+    #     - DBNAME=${DBNAME}
+    #     - DBUSER=${DBUSER}
+    #     - DBPASS=${DBPASS}
+    #     - REDIS_SLAVEOF_IP=${REDIS_SLAVEOF_IP:-}
+    #     - REDIS_SLAVEOF_PORT=${REDIS_SLAVEOF_PORT:-}
+    #   cap_add:
+    #     - NET_BIND_SERVICE
+    #   ports:
+    #     - "${SMTP_PORT:-25}:25"
+    #     - "${SMTPS_PORT:-465}:465"
+    #     - "${SUBMISSION_PORT:-587}:587"
+    #   restart: always
+    #   dns:
+    #     - ${IPV4_NETWORK:-172.22.1}.254
+    #   hostname: ${MAILCOW_HOSTNAME}
+    #   networks:
+    #     mailcow-network:
+    #       aliases:
+    #         - postfix
+    # memcached-mailcow:
+    #   image: memcached:alpine
+    #   restart: always
+    #   environment:
+    #     - TZ
+    #   networks:
+    #     mailcow-network:
+    #       aliases:
+    #         - memcached
+    # nginx-mailcow:
+    #   depends_on:
+    #     - sogo-mailcow
+    #     - php-fpm-mailcow
+    #     - redis-mailcow
+    #   image: nginx:mainline-alpine
+    #   dns:
+    #     - ${IPV4_NETWORK:-172.22.1}.254
+    #   command: /bin/sh -c "envsubst < /etc/nginx/conf.d/templates/listen_plain.template > /etc/nginx/conf.d/listen_plain.active &&
+    #     envsubst < /etc/nginx/conf.d/templates/listen_ssl.template > /etc/nginx/conf.d/listen_ssl.active &&
+    #     envsubst < /etc/nginx/conf.d/templates/server_name.template > /etc/nginx/conf.d/server_name.active &&
+    #     envsubst < /etc/nginx/conf.d/templates/sogo.template > /etc/nginx/conf.d/sogo.active &&
+    #     envsubst < /etc/nginx/conf.d/templates/sogo_eas.template > /etc/nginx/conf.d/sogo_eas.active &&
+    #     . /etc/nginx/conf.d/templates/sogo.auth_request.template.sh > /etc/nginx/conf.d/sogo_proxy_auth.active &&
+    #     . /etc/nginx/conf.d/templates/sites.template.sh > /etc/nginx/conf.d/sites.active &&
+    #     nginx -qt &&
+    #     until ping phpfpm -c1 > /dev/null; do sleep 1; done &&
+    #     until ping sogo -c1 > /dev/null; do sleep 1; done &&
+    #     until ping redis -c1 > /dev/null; do sleep 1; done &&
+    #     until ping rspamd -c1 > /dev/null; do sleep 1; done &&
+    #     exec nginx -g 'daemon off;'"
+    #   environment:
+    #     - HTTPS_PORT=${HTTPS_PORT:-443}
+    #     - HTTP_PORT=${HTTP_PORT:-80}
+    #     - MAILCOW_HOSTNAME=${MAILCOW_HOSTNAME}
+    #     - IPV4_NETWORK=${IPV4_NETWORK:-172.22.1}
+    #     - TZ
+    #     - ALLOW_ADMIN_EMAIL_LOGIN=${ALLOW_ADMIN_EMAIL_LOGIN:-n}
+    #   volumes:
+    #     - ./data/web:/web:ro
+    #     - ./data/conf/rspamd/dynmaps:/dynmaps:ro
+    #     - ./data/assets/ssl/:/etc/ssl/mail/:ro
+    #     - ./data/conf/nginx/:/etc/nginx/conf.d/:rw
+    #     - ./data/conf/rspamd/meta_exporter:/meta_exporter:ro
+    #     - sogo-web-vol-1:/usr/lib/GNUstep/SOGo/
+    #   ports:
+    #     - "${HTTPS_BIND:-0.0.0.0}:${HTTPS_PORT:-443}:${HTTPS_PORT:-443}"
+    #     - "${HTTP_BIND:-0.0.0.0}:${HTTP_PORT:-80}:${HTTP_PORT:-80}"
+    #   restart: always
+    #   networks:
+    #     mailcow-network:
+    #       aliases:
+    #         - nginx
+    # acme-mailcow:
+    #   depends_on:
+    #     - nginx-mailcow
+    #   image: mailcow/acme:1.70
+    #   dns:
+    #     - ${IPV4_NETWORK:-172.22.1}.254
+    #   environment:
+    #     - LOG_LINES=${LOG_LINES:-9999}
+    #     - ADDITIONAL_SAN=${ADDITIONAL_SAN}
+    #     - MAILCOW_HOSTNAME=${MAILCOW_HOSTNAME}
+    #     - DBNAME=${DBNAME}
+    #     - DBUSER=${DBUSER}
+    #     - DBPASS=${DBPASS}
+    #     - SKIP_LETS_ENCRYPT=${SKIP_LETS_ENCRYPT:-n}
+    #     - ENABLE_SSL_SNI=${ENABLE_SSL_SNI:-n}
+    #     - SKIP_IP_CHECK=${SKIP_IP_CHECK:-n}
+    #     - SKIP_HTTP_VERIFICATION=${SKIP_HTTP_VERIFICATION:-n}
+    #     - ONLY_MAILCOW_HOSTNAME=${ONLY_MAILCOW_HOSTNAME:-n}
+    #     - LE_STAGING=${LE_STAGING:-n}
+    #     - TZ
+    #     - REDIS_SLAVEOF_IP=${REDIS_SLAVEOF_IP:-}
+    #     - REDIS_SLAVEOF_PORT=${REDIS_SLAVEOF_PORT:-}
+    #     - SNAT_TO_SOURCE=${SNAT_TO_SOURCE:-n}
+    #     - SNAT6_TO_SOURCE=${SNAT6_TO_SOURCE:-n}
+    #   volumes:
+    #     - ./data/web/.well-known/acme-challenge:/var/www/acme:rw
+    #     - ./data/assets/ssl:/var/lib/acme/:rw
+    #     - ./data/assets/ssl-example:/var/lib/ssl-example/:ro
+    #     - mysql-socket-vol-1:/var/run/mysqld/
+    #   restart: always
+    #   networks:
+    #     mailcow-network:
+    #       aliases:
+    #         - acme
+    # netfilter-mailcow:
+    #   image: mailcow/netfilter:1.33
+    #   stop_grace_period: 30s
+    #   depends_on:
+    #     - dovecot-mailcow
+    #     - postfix-mailcow
+    #     - sogo-mailcow
+    #     - php-fpm-mailcow
+    #     - redis-mailcow
+    #   restart: always
+    #   privileged: true
+    #   environment:
+    #     - TZ
+    #     - IPV4_NETWORK=${IPV4_NETWORK:-172.22.1}
+    #     - IPV6_NETWORK=${IPV6_NETWORK:-fd4d:6169:6c63:6f77::/64}
+    #     - SNAT_TO_SOURCE=${SNAT_TO_SOURCE:-n}
+    #     - SNAT6_TO_SOURCE=${SNAT6_TO_SOURCE:-n}
+    #     - REDIS_SLAVEOF_IP=${REDIS_SLAVEOF_IP:-}
+    #     - REDIS_SLAVEOF_PORT=${REDIS_SLAVEOF_PORT:-}
+    #   network_mode: "host"
+    #   volumes:
+    #     - /lib/modules:/lib/modules:ro
+    # watchdog-mailcow:
+    #   image: mailcow/watchdog:1.73
+    #   # Debug
+    #   #command: /watchdog.sh
+    #   dns:
+    #     - ${IPV4_NETWORK:-172.22.1}.254
+    #   volumes:
+    #     - rspamd-vol-1:/var/lib/rspamd
+    #     - mysql-socket-vol-1:/var/run/mysqld/
+    #     - ./data/assets/ssl:/etc/ssl/mail/:ro
+    #   restart: always
+    #   environment:
+    #     - IPV6_NETWORK=${IPV6_NETWORK:-fd4d:6169:6c63:6f77::/64}
+    #     - LOG_LINES=${LOG_LINES:-9999}
+    #     - TZ
+    #     - DBNAME=${DBNAME}
+    #     - DBUSER=${DBUSER}
+    #     - DBPASS=${DBPASS}
+    #     - DBROOT=${DBROOT}
+    #     - USE_WATCHDOG=${USE_WATCHDOG:-n}
+    #     - WATCHDOG_NOTIFY_EMAIL=${WATCHDOG_NOTIFY_EMAIL}
+    #     - WATCHDOG_NOTIFY_BAN=${WATCHDOG_NOTIFY_BAN:-y}
+    #     - WATCHDOG_EXTERNAL_CHECKS=${WATCHDOG_EXTERNAL_CHECKS:-n}
+    #     - WATCHDOG_MYSQL_REPLICATION_CHECKS=${WATCHDOG_MYSQL_REPLICATION_CHECKS:-n}
+    #     - MAILCOW_HOSTNAME=${MAILCOW_HOSTNAME}
+    #     - IPV4_NETWORK=${IPV4_NETWORK:-172.22.1}
+    #     - IP_BY_DOCKER_API=${IP_BY_DOCKER_API:-0}
+    #     - CHECK_UNBOUND=${CHECK_UNBOUND:-1}
+    #     - SKIP_CLAMD=${SKIP_CLAMD:-n}
+    #     - SKIP_LETS_ENCRYPT=${SKIP_LETS_ENCRYPT:-n}
+    #     - HTTPS_PORT=${HTTPS_PORT:-443}
+    #     - REDIS_SLAVEOF_IP=${REDIS_SLAVEOF_IP:-}
+    #     - REDIS_SLAVEOF_PORT=${REDIS_SLAVEOF_PORT:-}
+    #     - EXTERNAL_CHECKS_THRESHOLD=1
+    #     - NGINX_THRESHOLD=5
+    #     - UNBOUND_THRESHOLD=5
+    #     - REDIS_THRESHOLD=5
+    #     - MYSQL_THRESHOLD=5
+    #     - MYSQL_REPLICATION_THRESHOLD=1
+    #     - SOGO_THRESHOLD=3
+    #     - POSTFIX_THRESHOLD=8
+    #     - CLAMD_THRESHOLD=15
+    #     - DOVECOT_THRESHOLD=12
+    #     - PHPFPM_THRESHOLD=5
+    #     - RATELIMIT_THRESHOLD=1
+    #     - FAIL2BAN_THRESHOLD=1
+    #     - ACME_THRESHOLD=1
+    #     - IPV6NAT_THRESHOLD=1
+    #     - RSPAMD_THRESHOLD=5
+    #     - OLEFY_THRESHOLD=5
+    #   networks:
+    #     mailcow-network:
+    #       aliases:
+    #         - watchdog
+    # dockerapi-mailcow:
+    #   image: mailcow/dockerapi:1.36
+    #   restart: always
+    #   oom_kill_disable: true
+    #   dns:
+    #     - ${IPV4_NETWORK:-172.22.1}.254
+    #   environment:
+    #     - DBROOT=${DBROOT}
+    #     - TZ
+    #   volumes:
+    #     - /var/run/docker.sock:/var/run/docker.sock:ro
+    #   networks:
+    #     mailcow-network:
+    #       aliases:
+    #         - dockerapi
+    # solr-mailcow:
+    #   image: mailcow/solr:1.7
+    #   restart: always
+    #   volumes:
+    #     - solr-vol-1:/opt/solr/server/solr/dovecot-fts/data
+    #   ports:
+    #     - "${SOLR_PORT:-127.0.0.1:18983}:8983"
+    #   environment:
+    #     - TZ
+    #     - SOLR_HEAP=${SOLR_HEAP:-1024}
+    #     - SKIP_SOLR=${SKIP_SOLR:-y}
+    #   networks:
+    #     mailcow-network:
+    #       aliases:
+    #         - solr
+    # olefy-mailcow:
+    #   image: mailcow/olefy:1.2
+    #   restart: always
+    #   environment:
+    #     - TZ
+    #     - OLEFY_BINDADDRESS=0.0.0.0
+    #     - OLEFY_BINDPORT=10055
+    #     - OLEFY_TMPDIR=/tmp
+    #     - OLEFY_PYTHON_PATH=/usr/bin/python3
+    #     - OLEFY_OLEVBA_PATH=/usr/bin/olevba3
+    #     - OLEFY_LOGLVL=20
+    #     - OLEFY_MINLENGTH=500
+    #     - OLEFY_DEL_TMP=1
+    #   networks:
+    #     mailcow-network:
+    #       aliases:
+    #         - olefy
+    # ipv6nat-mailcow:
+    #   depends_on:
+    #     - unbound-mailcow
+    #     - mysql-mailcow
+    #     - redis-mailcow
+    #     - clamd-mailcow
+    #     - rspamd-mailcow
+    #     - php-fpm-mailcow
+    #     - sogo-mailcow
+    #     - dovecot-mailcow
+    #     - postfix-mailcow
+    #     - memcached-mailcow
+    #     - nginx-mailcow
+    #     - acme-mailcow
+    #     - netfilter-mailcow
+    #     - watchdog-mailcow
+    #     - dockerapi-mailcow
+    #     - solr-mailcow
+    #   environment:
+    #     - TZ
+    #   image: robbertkl/ipv6nat
+    #   restart: always
+    #   privileged: true
+    #   network_mode: "host"
+    #   volumes:
+    #     - /var/run/docker.sock:/var/run/docker.sock:ro
+    #     - /lib/modules:/lib/modules:ro
