@@ -244,7 +244,7 @@ services:
         labels:
             - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
             - "traefik.http.routers.traefik.rule=Host(`${DASHBOARD_DOMAIN:?Domain for Traefik dashboard must be set!}`)"
-            # - "traefik.http.routers.traefik.middlewares=authelia@docker"
+            - "traefik.http.routers.traefik.middlewares=authelia@docker"
             - "traefik.http.routers.traefik.tls.certresolver=le"
             - "traefik.http.routers.traefik.entrypoints=secure"
             - "traefik.http.routers.traefik.service=api@internal"
@@ -270,7 +270,6 @@ services:
         restart: unless-stopped
         environment:
             - LDAP_RFC2307BIS_SCHEMA=true
-            - KEEP_EXISTING_CONFIG=true
             - LDAP_ORGANISATION
             - LDAP_DOMAIN
             - LDAP_ADMIN_PASSWORD
@@ -279,6 +278,7 @@ services:
             - LDAP_READONLY_USER=true
             - LDAP_READONLY_USER_USERNAME
             - LDAP_READONLY_USER_PASSWORD
+            - LDAP_TLS_ENFORCE=false
             - TZ
         tty: true
         stdin_open: true
@@ -291,7 +291,8 @@ services:
             - "636:636"
         networks:
             - proxy
-        command: --copy-service 
+        command: --copy-service
+
 
     ###############################
     #       PHPLDAPAdmin          #         

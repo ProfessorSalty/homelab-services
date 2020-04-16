@@ -2,3 +2,5 @@
 configuration.yml
 airsonic.properties
 env.yaml
+51-addgroups.ldif
+50-addusers.ldif
