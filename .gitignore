@@ -1,3 +1,4 @@
 .env
 configuration.yml
 airsonic.properties
+env.yaml

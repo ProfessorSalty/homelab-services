@@ -23,6 +23,9 @@ networks:
     exporters:
     portus:
     jaeger:
+    tdar:
+    guacamole:
+    graylog:
 
 volumes:
     nextcloud:
@@ -241,7 +244,7 @@ services:
         labels:
             - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
             - "traefik.http.routers.traefik.rule=Host(`${DASHBOARD_DOMAIN:?Domain for Traefik dashboard must be set!}`)"
-            - "traefik.http.routers.traefik.middlewares=authelia@docker"
+            # - "traefik.http.routers.traefik.middlewares=authelia@docker"
             - "traefik.http.routers.traefik.tls.certresolver=le"
             - "traefik.http.routers.traefik.entrypoints=secure"
             - "traefik.http.routers.traefik.service=api@internal"
@@ -256,6 +259,66 @@ services:
             - "${TRAEFIK_HTTPS_PORT:-443}:443" #HTTPS
         volumes:
             - ${SERVICES_ROOT}/${TRAEFIK_ROOT:-traefik}/le:/le
+
+    ###############################
+    #           OpenLDAP          #
+    ###############################
+
+    openldap:
+        image: osixia/openldap:1.3.0
+        container_name: openldap
+        restart: unless-stopped
+        environment:
+            - LDAP_RFC2307BIS_SCHEMA=true
+            - KEEP_EXISTING_CONFIG=true
+            - LDAP_ORGANISATION
+            - LDAP_DOMAIN
+            - LDAP_ADMIN_PASSWORD
+            - LDAP_CONFIG_PASSWORD
+            - LDAP_BASE_DN=${LDAP_LOGIN_BASE}
+            - LDAP_READONLY_USER=true
+            - LDAP_READONLY_USER_USERNAME
+            - LDAP_READONLY_USER_PASSWORD
+            - TZ
+        tty: true
+        stdin_open: true
+        volumes:
+            - ./configs/openldap/seeds:/container/service/slapd/assets/config/bootstrap/ldif/custom
+            - ${SERVICES_ROOT}/${OPENLDAP_ROOT:-openldap}/db:/var/lib/ldap
+            - ${SERVICES_ROOT}/${OPENLDAP_ROOT:-openldap}/config:/etc/ldap/slap.d
+        ports:
+            - "389:389"
+            - "636:636"
+        networks:
+            - proxy
+        command: --copy-service 
+
+    ###############################
+    #       PHPLDAPAdmin          #         
+    ###############################
+
+    phpldapadmin:
+        image: osixia/phpldapadmin
+        container_name: phpldapadmin
+        restart: unless-stopped
+        networks:
+            - proxy
+        environment:
+            PHPLDAPADMIN_HTTPS: "false"
+            PHPLDAPADMIN_LDAP_HOSTS: "#PYTHON2BASH:[
+                {'openldap': [
+                    {'server': [{'tls': False}]},
+                    {'login': [
+                            {'bind_id': 'cn=admin,${LDAP_LOGIN_BASE}'},
+                            {'bind_pass': '${LDAP_ADMIN_PASSWORD}'},
+                            {'attr': 'cn'}
+                        ]
+                    }]}]"
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.phpldapadmin.rule=Host(`${PHPLDAPADMIN_DOMAIN:?Domain for PHPLDAPAdmin must be set!}`)"
+            - "traefik.http.routers.phpldapadmin.entrypoints=secure"
+            - "traefik.http.routers.phpldapadmin.tls.certresolver=le"
 
     ###############################
     #           Jaeger            #
@@ -278,7 +341,6 @@ services:
     #     restart: unless-stopped
     #     depends_on:
     #         - cassandra-schema
-
     # # frontend
     # jaeger-query:
     #     image: jaegertracing/jaeger-query
@@ -302,7 +364,6 @@ services:
     #         - "traefik.http.services.jaeger.loadbalancer.server.port=16686"
     #         - "traefik.http.routers.jaeger.entrypoints=secure"
     #         - "traefik.http.routers.jaeger.tls.certresolver=le"
-
     # jaeger-agent:
     #     image: jaegertracing/jaeger-agent
     #     command: ["--reporter.grpc.host-port=jaeger-collector:14250"]
@@ -316,73 +377,16 @@ services:
     #         - jaeger
     #     depends_on:
     #         - jaeger-collector
-
     # cassandra:
     #     image: cassandra:3.9
     #     networks:
     #         - jaeger
-
     # cassandra-schema:
     #     image: jaegertracing/jaeger-cassandra-schema
     #     networks:
     #         - jaeger
     #     depends_on:
     #         - cassandra
-
-
-    ###############################
-    #           Freeipa           #
-    ###############################
-
-    freeipa:
-        image: freeipa/freeipa-server
-        command:
-            [
-                "--realm=${LDAP_DOMAIN}",
-                "--ds-password=${LDAP_USER_PASSWORD}",
-                "--admin-password=${LDAP_ADMIN_PASSWORD}",
-                "-U",
-            ]
-        hostname: ${LDAP_DOMAIN}
-        sysctls:
-            - net.ipv6.conf.all.disable_ipv6=0
-        container_name: freeipa
-        restart: unless-stopped
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.freeipa.rule=Host(`${FREEIPA_DOMAIN:?Domain for Freeipa must be set!}`)"
-            - "traefik.http.routers.freeipa.entrypoints=secure"
-            - "traefik.http.routers.freeipa.tls.certresolver=le"
-        networks:
-            - proxy
-        environment:
-            - IPA_SERVER_HOSTNAME=${FREEIPA_DOMAIN}
-        ports:
-            # Kerberos
-            - "88:88/udp"
-            - "88:88"
-            - "464:464/udp"
-            - "464:464"
-            # LDAP
-            - "389:389"
-            - "636:636"
-            # DNS
-            # - "53:53/udp"
-            # - "53:53"
-            # NTP
-            - "123:123/udp"
-            # other
-            - "7389:7389"
-            - "9443:9443"
-        volumes:
-            - ${SERVICES_ROOT}/${FREEIPA_ROOT:-freeipa}/db:/data
-            - ${SERVICES_ROOT}/${FREEIPA_ROOT:-freeipa}/logs:/var/log
-            - /sys/fs/cgroup:/sys/fs/cgroup:ro
-        tmpfs:
-            - /run
-            - /var/cache
-            - /tmp
-
     # ###############################
     # #           Nextcloud         #
     # ###############################
@@ -604,7 +608,7 @@ services:
     # qbittorrent:
     #     image: linuxserver/qbittorrent
     #     container_name: qbittorrent
-        # network_mode: service:vpn
+    # network_mode: service:vpn
     #     environment:
     #         - PUID=1000
     #         - PGID=1000
@@ -612,7 +616,7 @@ services:
     #         - UMASK_SET=022
     #     volumes:
     #         - ${SERVICES_ROOT}/${QBITORRENT_ROOT:-qbitorrent}/config:/config
-            # - ${DOWNLOADS_ROOT}:/downloads
+    # - ${DOWNLOADS_ROOT}:/downloads
     #     ports:
     #         - 6881:6881
     #         - 6881:6881/udp
@@ -630,7 +634,7 @@ services:
     #     image: linuxserver/transmission
     #     container_name: transmission
     #     restart: unless-stopped
-        # network_mode: service:vpn
+    # network_mode: service:vpn
     #     networks:
     #         - proxy
     #         - exporters
@@ -647,7 +651,7 @@ services:
     #         - 51413:51413/udp
     #     volumes:
     #         - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/config:/config
-            # - ${DOWNLOADS_ROOT}:/downloads
+    # - ${DOWNLOADS_ROOT}:/downloads
     #         - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/torrentfiles:/watch
     #     labels:
     #         - "traefik.enable=true"
@@ -1744,7 +1748,6 @@ services:
     #         - ${SERVICES_ROOT}/${DUPLCATI_ROOT:-duplicati}/backups:/backups
     #         - ${SERVICES_ROOT}/${DUPLCATI_ROOT:-duplicati}/source:/source
     #     restart: unless-stopped
-
     ###############################
     #           Jitsi             #
     ###############################
@@ -1791,7 +1794,6 @@ services:
     #         - "traefik.http.routers.app.entrypoints=websecure"
     #         - "traefik.http.routers.app.rule=Host(`${HOST}`)"
     #         - "traefik.http.routers.app.tls.certresolver=lecertresolver"
-
     # # XMPP server
     # prosody:
     #     image: jitsi/prosody
@@ -1854,7 +1856,6 @@ services:
     #         meet.jitsi:
     #             aliases:
     #                 - ${XMPP_SERVER}
-
     # # Focus component
     # jicofo:
     #     image: jitsi/jicofo
@@ -1879,7 +1880,6 @@ services:
     #         - prosody
     #     networks:
     #         meet.jitsi:
-
     # # Video bridge
     # jvb:
     #     image: jitsi/jvb
@@ -1906,7 +1906,6 @@ services:
     #         - prosody
     #     networks:
     #         meet.jitsi:
-
     # ###############################
     # #           NordVPN           #
     # ###############################
@@ -1926,11 +1925,9 @@ services:
     #         - NETWORK=192.168.1.0/24
     #         - TZ
     #     restart: unless-stopped
-
     # ###############################
     # #           Graylog           #
     # ###############################
-
     # graylog:
     #     image: graylog/graylog:3.2
     #     container_name: graylog
@@ -1961,14 +1958,12 @@ services:
     #         - 12201:12201
     #         # GELF UDP
     #         - 12201:12201/udp
-
     # graylog-db:
     #     image: mongo:3
     #     container_name: graylog-db
     #     restart: unless-stopped
     #     networks:
     #         - graylog
-
     # graylog-elasticsearch:
     #     image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.8.5
     #     container_name: graylog-elasticsearch
@@ -1988,7 +1983,6 @@ services:
     #             memory: 1g
     #     networks:
     #         - graylog
-
     # ###############################
     # #         Guacamole           #
     # ###############################
@@ -2014,14 +2008,12 @@ services:
     #         - LDAP_SEARCH_BIND_DN
     #         - LDAP_SEARCH_BIND_PASSWORD
     #         - GUACD_HOSTNAME
-
     # guacd:
     #     image: guacamole/guacd
     #     container_name: guacd
     #     restart: unless-stopped
     #     networks:
     #         - guacamole
-            
     # ###############################
     # #         Cyberchef           #
     # ###############################
@@ -2037,7 +2029,6 @@ services:
     #         - "traefik.http.routers.cyberchef.entrypoints=secure"
     #         - "traefik.http.services.cyberchef.loadbalancer.server.port=8000"
     #         - "traefik.http.routers.cyberchef.tls.certresolver=le"
-
     # ###############################
     # #         Statping            #
     # ###############################
@@ -2057,7 +2048,6 @@ services:
     #         - "traefik.http.routers.statping.entrypoints=secure"
     #         - "traefik.http.services.statping.loadbalancer.server.port=8080"
     #         - "traefik.http.routers.statping.tls.certresolver=le"
-
     # ###############################
     # #         Radarr              #
     # ###############################
@@ -2082,7 +2072,6 @@ services:
     #         - "traefik.http.routers.radarr.tls.certresolver=le"
     #         - "traefik.http.routers.radarr.middlewares=authelia@docker"
     #     restart: unless-stopped
-
     # ###############################
     # #         Lidarr              #
     # ###############################
@@ -2107,7 +2096,6 @@ services:
     #         - "traefik.http.routers.lidarr.tls.certresolver=le"
     #         - "traefik.http.routers.lidarr.middlewares=authelia@docker"
     #     restart: unless-stopped
-
     # ###############################
     # #         Sonarr              #
     # ###############################
@@ -2132,7 +2120,6 @@ services:
     #         - "traefik.http.routers.sonarr.tls.certresolver=le"
     #         - "traefik.http.routers.sonarr.middlewares=authelia@docker"
     #     restart: unless-stopped
-
     # ###############################
     # #         Jackett             #
     # ###############################
@@ -2156,7 +2143,6 @@ services:
     #         - "traefik.http.routers.jackett.tls.certresolver=le"
     #         - "traefik.http.routers.jackett.middlewares=authelia@docker"
     #     restart: unless-stopped
-
     # ###############################
     # #         Beets               #
     # ###############################
@@ -2181,4 +2167,58 @@ services:
     #         - "traefik.http.services.beets.loadbalancer.server.port=8337"
     #         - "traefik.http.routers.beets.tls.certresolver=le"
     #         - "traefik.http.routers.beets.middlewares=authelia@docker"
+    #     restart: unless-stopped
+    # ###############################
+    # #         Tdarr               #
+    # ###############################
+    # tdarr:
+    #     image: haveagitgat/tdarr
+    #     container_name: tdarr
+    #     environment:
+    #         - MONGO_URL="mongodb://tdarr-db:27017/tdarr"
+    #     volumes:
+    # - ${SERVICES_ROOT}/${TDARR_ROOT:-tdarr}/data:/home/Tdarr/Documents/Tdarr
+    # - ${MOVIES_ROOT}:/home/Tdarr/movies
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.tdarr.rule=Host(`${BEETS_DOMAIN:?Domain for Beets must be set!}`)"
+    #         - "traefik.http.routers.tdarr.entrypoints=secure"
+    #         - "traefik.http.services.tdarr.loadbalancer.server.port=8337"
+    #         - "traefik.http.routers.tdarr.tls.certresolver=le"
+    #         - "traefik.http.routers.tdarr.middlewares=authelia@docker"
+    #     restart: unless-stopped
+    # tdarr-db:
+    #     image: mongo:latest
+    #     container_name: tdarr-db
+    #     restart: always
+    #     command: mongod --oplogSize 128
+    #     networks:
+    #         - proxy
+    #         - tdarr
+    #     expose:
+    #         - 27017
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${TDARR_ROOT:-tdarr}/db:/data/db
+    #         - ${SERVICES_ROOT}/${TDARR_ROOT:-tdarr}/db-dump:/dump
+    # ###############################
+    # #         SABNZBD               #
+    # ###############################
+    # sabnzbd:
+    #     image: linuxserver/sabnzbd
+    #     container_name: sabnzbd
+    #     environment:
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - TZ
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${SABNZBD_ROOT:-sabnzbd}/config:/config
+    #         - ${SERVICES_ROOT}/${SABNZBD_ROOT:-sabnzbd}/incomplete:/incomplete-downloads #optional
+    #         - ${DOWNLOADS_ROOT}:/downloads
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.sabnzbd.rule=Host(`${SABNZBD_DOMAIN:?Domain for SABNZBD must be set!}`)"
+    #         - "traefik.http.routers.sabnzbd.entrypoints=secure"
+    #         - "traefik.http.services.sabnzbd.loadbalancer.server.port=8080"
+    #         - "traefik.http.routers.sabnzbd.tls.certresolver=le"
+    #         - "traefik.http.routers.sabnzbd.middlewares=authelia@docker"
     #     restart: unless-stopped
