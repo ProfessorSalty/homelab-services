@@ -26,6 +26,8 @@ networks:
     tdar:
     guacamole:
     graylog:
+    calibre:
+    friendica:
 
 volumes:
     nextcloud:
@@ -33,6 +35,8 @@ volumes:
     lychee-db:
     portainer_data:
     bookstack:
+    statping_data:
+    friendica:
 
 services:
     ###############################
@@ -225,6 +229,9 @@ services:
             - dockerproxy
         environment:
             - TZ
+        env_file:
+            - .env
+            - configs/traefik/providers.env
         command:
             # - --log.level=DEBUG
             # - --metrics.prometheus=true
@@ -240,7 +247,9 @@ services:
             - --api
             - --certificatesresolvers.le.acme.email=${LETSENCRYPT_EMAIL:?Please supply LetsEncrypt with an email}
             - --certificatesresolvers.le.acme.storage=/le/acme.json
-            - --certificatesresolvers.le.acme.tlschallenge=true
+            # - --certificatesresolvers.le.acme.tlschallenge=true
+            - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
+            - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=namecheap"
         labels:
             - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
             - "traefik.http.routers.traefik.rule=Host(`${DASHBOARD_DOMAIN:?Domain for Traefik dashboard must be set!}`)"
@@ -441,7 +450,7 @@ services:
     #         - POSTGRES_DB=nextcloud
     #         - NEXTCLOUD_HOSTNAME=${NEXTCLOUD_DOMAIN}
     #         - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_DOMAIN} localhost
-    #         # - NEXTCLOUD_LDAP_HOST=freeipa
+    #         # - NEXTCLOUD_LDAP_HOST=openldap
     #         # - NEXTCLOUD_LDAP_AGENT_NAME=
     #         - REDIS_HOST=nextcloud-cache
     #         - SMTP_HOST=${SMTP_HOST}
@@ -490,17 +499,17 @@ services:
     #         - ${SERVICES_ROOT}/${EMBY_ROOT:-emby}/media:/media:ro
     #         - ${SERVICES_ROOT}/${EMBY_ROOT:-emby}/transcoding:/transcoding:ro
     #         - ${SERVICES_ROOT}/${EMBY_ROOT:-emby}/config:/config
-    #     # device:
-    #     #     - /dev/dri:/dev/dri
+    #     devices:
+    #         - /dev/dri:/dev/dri
     #     labels:
     #         - "traefik.enable=true"
     #         - "traefik.http.services.emby.loadbalancer.server.port=8096"
     #         - "traefik.http.routers.emby.rule=Host(`${EMBY_DOMAIN:?Domain for Emby must be set!}`)"
     #         - "traefik.http.routers.emby.entrypoints=secure"
     #         - "traefik.http.routers.emby.tls.certresolver=le"
-    # ###############################
-    # #           EmbyStats         #
-    # ###############################
+    # # ###############################
+    # # #           EmbyStats         #
+    # # ###############################
     # embystats:
     #     image:  uping/embystat:beta
     #     restart: unless-stopped
@@ -516,9 +525,9 @@ services:
     #         - "traefik.http.routers.embystats.entrypoints=secure"
     #         - "traefik.http.routers.embystats.middleware=authelia@docker"
     #         - "traefik.http.routers.embystats.tls.certresolver=le"
-    # ###############################
-    # #           Jellyfin          #
-    # ###############################
+    # # ###############################
+    # # #           Jellyfin          #
+    # # ###############################
     # jellyfin:
     #     image: jellyfin/jellyfin
     #     container_name: jellyfin
@@ -536,10 +545,10 @@ services:
     #         - "traefik.http.routers.jellyfin.rule=Host(`${JELLYFIN_DOMAIN:?Domain for Jellyfin must be set!}`)"
     #         - "traefik.http.routers.jellyfin.entrypoints=secure"
     #         - "traefik.http.routers.jellyfin.tls.certresolver=le"
-    #
-    ###############################
-    #           Gitea             #
-    ###############################
+    
+    # ###############################
+    # #           Gitea             #
+    # ###############################
     # gitea:
     #     image: gitea/gitea:1
     #     container_name: gitea
@@ -558,7 +567,7 @@ services:
     #         - gitea
     #     volumes:
     #         - ${SERVICES_ROOT}/${GITEA_ROOT:-gitea}/data:/data
-    # - ./configs/gitea:/data/gitea
+    #         - ./configs/gitea:/data/gitea/conf
     #         - /etc/timezone:/etc/timezone:ro
     #         - /etc/localtime:/etc/localtime:ro
     #     labels:
@@ -593,6 +602,8 @@ services:
     #     image: linuxserver/deluge
     #     container_name: deluge
     #     network_mode: service:vpn
+    #     depends_on:
+    #         - vpn
     #     environment:
     #         - PUID=1000
     #         - PGID=1000
@@ -609,7 +620,9 @@ services:
     # qbittorrent:
     #     image: linuxserver/qbittorrent
     #     container_name: qbittorrent
-    # network_mode: service:vpn
+    #     network_mode: service:vpn
+    #     depends_on:
+    #         - vpn
     #     environment:
     #         - PUID=1000
     #         - PGID=1000
@@ -617,7 +630,7 @@ services:
     #         - UMASK_SET=022
     #     volumes:
     #         - ${SERVICES_ROOT}/${QBITORRENT_ROOT:-qbitorrent}/config:/config
-    # - ${DOWNLOADS_ROOT}:/downloads
+    #         - ${DOWNLOADS_ROOT}:/downloads
     #     ports:
     #         - 6881:6881
     #         - 6881:6881/udp
@@ -628,49 +641,7 @@ services:
     #         - "traefik.http.routers.qbitorrent.middlewares=authelia@docker"
     #         - "traefik.http.routers.qbitorrent.tls.certresolver=le"
     #     restart: unless-stopped
-    # ###############################
-    # #         Transmission        #
-    # ###############################
-    # transmission:
-    #     image: linuxserver/transmission
-    #     container_name: transmission
-    #     restart: unless-stopped
-    # network_mode: service:vpn
-    #     networks:
-    #         - proxy
-    #         - exporters
-    #     depends_on:
-    #         - traefik
-    #     environment:
-    #         - PUID=${UID:-1000}
-    #         - PGID=${GID:-1000}
-    #         - TZ
-    #     expose:
-    #         - 9091
-    #     ports:
-    #         - 51413:51413
-    #         - 51413:51413/udp
-    #     volumes:
-    #         - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/config:/config
-    # - ${DOWNLOADS_ROOT}:/downloads
-    #         - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/torrentfiles:/watch
-    #     labels:
-    #         - "traefik.enable=true"
-    #         - "traefik.http.routers.transmission.rule=Host(`${TRANSMISSION_DOMAIN:?Domain for Transmission must be set!}`)"
-    #         - "traefik.http.services.transmission.loadbalancer.server.port=9091"
-    #         - "traefik.http.routers.transmission.entrypoints=secure"
-    #         - "traefik.http.routers.transmission.middlewares=authelia@docker"
-    #         - "traefik.http.routers.transmission.tls.certresolver=le"
-    # transmission-exporter:
-    #     image: metalmatze/transmission-exporter
-    #     container_name: transmission-exporter
-    #     restart: always
-    #     networks:
-    #         - exporters
-    #     ports:
-    #         - "127.0.0.1:19091:19091"
-    #     environment:
-    #         TRANSMISSION_ADDR: http://transmission:9091
+    
     # ###############################
     # #           Jenkins           #
     # ###############################
@@ -690,9 +661,9 @@ services:
     #         - "traefik.http.services.jenkins.loadbalancer.server.port=8080"
     #         - "traefik.http.routers.jenkins.entrypoints=secure"
     #         - "traefik.http.routers.jenkins.tls.certresolver=le"
-    ###############################
-    #           Portus            #
-    ###############################
+    # ###############################
+    # #           Portus            #
+    # ###############################
     # portus:
     #     image: opensuse/portus
     #     container_name: portus
@@ -700,23 +671,23 @@ services:
     #     environment:
     #         - PORTUS_CHECK_SSL_USAGE_ENABLED=false
     #         - PORTUS_SECRET_KEY_BASE
-    #         - PORTUS_EMAIL_FROM
-    #         - PORTUS_EMAIL_NAME=Portus
-    #         - PORTUS_EMAIL_SMTP_ENABLED=true
-    #         - PORTUS_EMAIL_SMTP_ADDRESS=${SMTP_ADDRESS}
-    #         - PORTUS_EMAIL_SMTP_DOMAIN=${SMTP_DOMAIN}
-    #         - PORTUS_EMAIL_SMTP_PORT=${SMTP_PORT:-587}
-    #         - PORTUS_EMAIL_SMTP_USERNAME=${SMTP_USERNAME}
-    #         - PORTUS_EMAIL_SMTP_PASSWORD=${SMTP_PASSWORD}
-    #         - PORTUS_EMAIL_SMTP_AUTHENTICATION=${SMTP_AUTHENTICATION:-login}
+    #         # - PORTUS_EMAIL_FROM
+    #         # - PORTUS_EMAIL_NAME=Portus
+    #         # - PORTUS_EMAIL_SMTP_ENABLED=true
+    #         # - PORTUS_EMAIL_SMTP_ADDRESS=${SMTP_ADDRESS}
+    #         # - PORTUS_EMAIL_SMTP_DOMAIN=${SMTP_DOMAIN}
+    #         # - PORTUS_EMAIL_SMTP_PORT=${SMTP_PORT:-587}
+    #         # - PORTUS_EMAIL_SMTP_USERNAME=${SMTP_USERNAME}
+    #         # - PORTUS_EMAIL_SMTP_PASSWORD=${SMTP_PASSWORD}
+    #         # - PORTUS_EMAIL_SMTP_AUTHENTICATION=${SMTP_AUTHENTICATION:-login}
     #         - PORTUS_LDAP_ENABLED=true
-    #         - PORTUS_LDAP_HOSTNAME=freeipa
+    #         - PORTUS_LDAP_HOSTNAME=openldap
     #         - PORTUS_LDAP_PORT=389
     #         - PORTUS_LDAP_UID=uid
-    #         - PORTUS_LDAP_BASE=ou=users,${LDAP_LOGIN_BASE}
+    #         - PORTUS_LDAP_BASE=ou=people,${LDAP_LOGIN_BASE}
     #         - PORTUS_LDAP_ADMIN_BASE=ou=admin,${LDAP_LOGIN_BASE}
     #         - PORTUS_LDAP_GUESS_EMAIL_ENALBED=true
-    #         - PORTUS_LDAP_GUESS_EMAIL_ATTR=userEmail
+    #         - PORTUS_LDAP_GUESS_EMAIL_ATTR=mail
     #         - PORTUS_DB_HOST=portus-db
     #         - PORTUS_DB_DATABASE=portus
     #         - PORTUS_DB_USERNAME=portus
@@ -747,9 +718,9 @@ services:
     #     networks:
     #         - portus
     #     restart: unless-stopped
-    ###############################
-    #           Bookstack         #
-    ###############################
+    # ###############################
+    # #           Bookstack         #
+    # ###############################
     # bookstack:
     #     image: linuxserver/bookstack
     #     container_name: bookstack
@@ -764,7 +735,7 @@ services:
     #         - DB_PASS=${BOOKSTACK_DB_PASSWORD}
     #         - DB_DATABASE=bookstackapp
     #         - AUTH_METHOD=ldap
-    #         - LDAP_SERVER=freeipa
+    #         - LDAP_SERVER=openldap
     #         - LDAP_BASE_DN=ou=people,${LDAP_LOGIN_BASE}
     #         - LDAP_DN=cn=admin,${LDAP_LOGIN_BASE}
     #         - LDAP_PASS=${LDAP_ADMIN_PASSWORD}
@@ -814,11 +785,11 @@ services:
     #     restart: unless-stopped
     #     networks:
     #         - bookstack
-    ###############################
-    #           Organizr          #
-    ###############################
+    # ##############################
+    # #          Organizr          #
+    # ##############################
     # organizr:
-    #     image: linuxserver/organizr
+    #     image: organizrtools/organizr-v2
     #     container_name: organizr
     #     environment:
     #         - PUID=1000
@@ -832,8 +803,10 @@ services:
     #         - "traefik.http.routers.organizr.entrypoints=secure"
     #         - "traefik.http.routers.organizr.tls.certresolver=le"
     #     volumes:
-    #         - ${SERVICES_ROOT}/${ORGANIZR_ROOT:-organizr}:/config
+    #         - ${SERVICES_ROOT}/${ORGANIZR_ROOT:-organizr}/config:/config
+    #         - ${SERVICES_ROOT}/${ORGANIZR_ROOT:-organizr}/db:/db
     #     restart: unless-stopped
+
     # ###############################
     # #           Muximux          #
     # ###############################
@@ -951,9 +924,9 @@ services:
     #     networks:
     #         - proxy
     #         - mastadon
-    ###############################
-    #           Friendica         #
-    ###############################
+    # ###############################
+    # #           Friendica         #
+    # ###############################
     # friendica:
     #     image: friendica:fpm
     #     restart: always
@@ -1002,7 +975,9 @@ services:
     # ###############################
     # calibre:
     #     image: linuxserver/calibre
-    #     container_name: calibre
+    #     container_name: caibre
+    #     networks:
+    #         - calibre
     #     environment:
     #         - PUID=1000
     #         - PGID=1000
@@ -1012,13 +987,19 @@ services:
     #         - UMASK_SET=022 #optional
     #     volumes:
     #         - ${SERVICES_ROOT}/${CALIBRE_ROOT:-calibre}/db:/config
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.calibre.rule=Host(`${CALIBRE_DOMAIN:?Domain for Calibre-web must be set!}`)"
+    #         - "traefik.http.routers.calibre.entrypoints=secure"
+    #         - "traefik.http.services.calibre.loadbalancer.server.port=8080"
+    #         - "traefik.http.routers.calibre.tls.certresolver=le"
     #     # ports:
     #     #     - 8080:8080
     #     #     - 8081:8081
     #     restart: unless-stopped
-    ###############################
-    #        Calibre-web          #
-    ###############################
+    # ###############################
+    # #        Calibre-web          #
+    # ###############################
     # calibre-web:
     #     image: linuxserver/calibre-web
     #     container_name: calibre-web
@@ -1031,7 +1012,7 @@ services:
     #         - DOCKER_MODS=linuxserver/calibre-web:calibre
     #     labels:
     #         - "traefik.enable=true"
-    #         - "traefik.http.routers.calibre.rule=Host(`${CALIBRE_DOMAIN:?Domain for Calibre-web must be set!}`)"
+    #         - "traefik.http.routers.calibre.rule=Host(`${CALIBRE_WEB_DOMAIN:?Domain for Calibre-web must be set!}`)"
     #         - "traefik.http.routers.calibre.entrypoints=secure"
     #         - "traefik.http.services.calibre.loadbalancer.server.port=8083"
     #         - "traefik.http.routers.calibre.tls.certresolver=le"
@@ -1039,9 +1020,9 @@ services:
     #         - ${SERVICES_ROOT}/${CALIBRE_ROOT:-calibre}/data:/config
     #         - ${SERVICES_ROOT}/${CALIBRE_ROOT:-calibre}/db:/books
     #     restart: unless-stopped
-    ###############################
-    #        Airsonic .           #
-    ###############################
+    # ###############################
+    # #        Airsonic .           #
+    # ###############################
     # airsonic:
     #     image: linuxserver/airsonic
     #     container_name: airsonic
@@ -1065,9 +1046,9 @@ services:
     #         - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/podcasts:/podcasts
     #         - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/media:/media
     #     restart: unless-stopped
-    ###############################
-    #           Wekan             #
-    ###############################
+    # ###############################
+    # #           Wekan             #
+    # ###############################
     # wekan-db:
     #     image: mongo:latest
     #     container_name: wekan-db
@@ -1112,7 +1093,7 @@ services:
     #         - DEFAULT_AUTHENTICATION_METHOD=ldap
     #         - LDAP_ENABLE=true
     #         - LDAP_PORT=389
-    #         - LDAP_HOST=freeipa
+    #         - LDAP_HOST=openldap
     #         - LDAP_BASEDN=${LDAP_LOGIN_BASE}
     #         - LDAP_LOGIN_FALLBACK=false
     #         - LDAP_RECONNECT=true
@@ -1907,25 +1888,71 @@ services:
     #         - prosody
     #     networks:
     #         meet.jitsi:
-    # ###############################
-    # #           NordVPN           #
-    # ###############################
-    #     # https://github.com/bubuntux/nordvpn
-    # vpn:
-    #     image: bubuntux/nordvpn
-    #     network_mode: bridge
-    #     cap_add:
-    #         - net_admin
-    #     devices:
-    #         - /dev/net/tun
-    #     environment:
-    #         - USER=${NORDVPN_USERNAME}
-    #         - PASS=${NORDVPN_PASSWORD}
-    #         - CONNECT=United_States
-    #         - TECHNOLOGY=NordLynx
-    #         - NETWORK=192.168.1.0/24
-    #         - TZ
-    #     restart: unless-stopped
+    ###############################
+    #           NordVPN           #
+    ###############################
+        # https://github.com/bubuntux/nordvpn
+    vpn:
+        image: bubuntux/nordvpn
+        network_mode: bridge
+        cap_add:
+            - net_admin
+        devices:
+            - /dev/net/tun
+        environment:
+            - USER=${NORDVPN_USERNAME}
+            - PASS=${NORDVPN_PASSWORD}
+            - CONNECT=United_States
+            - TECHNOLOGY=NordLynx
+            - NETWORK=192.168.1.0/24
+            - TZ
+        restart: unless-stopped
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.transmission.rule=Host(`${TRANSMISSION_DOMAIN:?Domain for Transmission must be set!}`)"
+            - "traefik.http.services.transmission.loadbalancer.server.port=9091"
+            - "traefik.http.routers.transmission.entrypoints=secure"
+            # - "traefik.http.routers.transmission.middlewares=authelia@docker"
+            - "traefik.http.routers.transmission.tls.certresolver=le"
+
+    ###############################
+    #         Transmission        #
+    ###############################
+    transmission:
+        image: linuxserver/transmission
+        container_name: transmission
+        restart: unless-stopped
+        network_mode: service:vpn
+        # networks:
+        #     - proxy
+        #     - exporters
+        depends_on:
+            - traefik
+            - vpn
+        environment:
+            - PUID=${UID:-1000}
+            - PGID=${GID:-1000}
+            - TZ
+        # expose:
+        #     - 9091
+        # ports:
+        #     - 51413:51413
+        #     - 51413:51413/udp
+        volumes:
+            - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/config:/config
+            - ${DOWNLOADS_ROOT}:/downloads
+            - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/torrentfiles:/watch
+        
+    transmission-exporter:
+        image: metalmatze/transmission-exporter
+        container_name: transmission-exporter
+        restart: always
+        networks:
+            - exporters
+        ports:
+            - "127.0.0.1:19091:19091"
+        environment:
+            TRANSMISSION_ADDR: http://transmission:9091
     # ###############################
     # #           Graylog           #
     # ###############################
@@ -1935,9 +1962,8 @@ services:
     #     environment:
     #         # CHANGE ME (must be at least 16 characters)!
     #         - GRAYLOG_PASSWORD_SECRET=${GRAYLOG_SECRET}
-    #         # Password: admin
     #         - GRAYLOG_ROOT_PASSWORD_SHA2
-    #         - GRAYLOG_HTTP_EXTERNAL_URI=http://${GRAYLOG_DOMAIN}
+    #         - GRAYLOG_HTTP_EXTERNAL_URI=https://${GRAYLOG_DOMAIN}
     #     networks:
     #         - graylog
     #         - proxy
