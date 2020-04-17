@@ -18,7 +18,6 @@ networks:
     firefly:
     mastadon:
     wekan:
-    freshrss:
     wallabag:
     exporters:
     portus:
@@ -152,7 +151,7 @@ services:
             - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_DOMAIN:?Domain for Portainer must be set!}`)"
             - "traefik.http.routers.portainer.entrypoints=secure"
             - "traefik.http.services.portainer.loadbalancer.server.port=9000"
-            - "traefik.http.routers.portainer.tls.certresolver=le"
+            - "traefik.http.routers.portainer.tls=true"
 
     ###############################
     #           Authelia          #
@@ -176,12 +175,7 @@ services:
             - "traefik.enable=true"
             - "traefik.http.routers.authelia.rule=Host(`${AUTHELIA_DOMAIN:?Domain for Authelia must be set!}`)"
             - "traefik.http.routers.authelia.entrypoints=secure"
-            # The rd param points to the login endpoint
-            # https://github.com/authelia/authelia/blob/6f116202f487a653a6579fe4232e4677529bd480/internal/handlers/handler_verify.go#L205
-            - "traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://${AUTHELIA_DOMAIN}"
-            - "traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true"
             - "traefik.http.routers.authelia.tls=true"
-            - "traefik.http.routers.authelia.tls.certresolver=le"
         restart: unless-stopped
         environment:
             - AUTHELIA_SESSION_SECRET
@@ -233,40 +227,17 @@ services:
             - .env
             - configs/traefik/providers.env
         command:
-            # - --log.level=DEBUG
-            # - --metrics.prometheus=true
-            # - --tracing.jaeger=true
-            # - --tracing.jaeger.samplingServerURL=http://jaeger-agent:5778/sampling
-            - --entrypoints.web.address=:80
-            - --entrypoints.secure.address=:443
-            - --entrypoints.ssh.address=:22
-            - --providers.docker
-            - --providers.docker.exposedByDefault=false
-            - --providers.docker.network=proxy
-            - --providers.docker.endpoint=tcp://dockerproxy:2375
-            - --api
             - --certificatesresolvers.le.acme.email=${LETSENCRYPT_EMAIL:?Please supply LetsEncrypt with an email}
-            - --certificatesresolvers.le.acme.storage=/le/acme.json
-            # - --certificatesresolvers.le.acme.tlschallenge=true
-            - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
-            - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=namecheap"
         labels:
-            - "traefik.http.middlewares.https-redirect.redirectscheme.scheme=https"
-            - "traefik.http.routers.traefik.rule=Host(`${DASHBOARD_DOMAIN:?Domain for Traefik dashboard must be set!}`)"
-            - "traefik.http.routers.traefik.middlewares=authelia@docker"
-            - "traefik.http.routers.traefik.tls.certresolver=le"
-            - "traefik.http.routers.traefik.entrypoints=secure"
-            - "traefik.http.routers.traefik.service=api@internal"
-            - "traefik.http.routers.redirs.rule=hostregexp(`{host:.+}`)"
-            - "traefik.http.routers.redirs.middlewares=https-redirect"
-            - "traefik.http.routers.redirs.entrypoints=web"
             - "traefik.enable=true"
         networks:
             - proxy
         ports:
-            - "${TRAEFIK_HTTP_PORT:-80}:80" #HTTP
-            - "${TRAEFIK_HTTPS_PORT:-443}:443" #HTTPS
+            - "${TRAEFIK_HTTP_PORT:-80}:80" 
+            - "${TRAEFIK_HTTPS_PORT:-443}:443"
         volumes:
+            - ./configs/traefik/static.yml:/traefik.yml
+            - ./configs/traefik/dynamic.yml:/dynamic.yml
             - ${SERVICES_ROOT}/${TRAEFIK_ROOT:-traefik}/le:/le
 
     ###############################
@@ -328,8 +299,68 @@ services:
             - "traefik.enable=true"
             - "traefik.http.routers.phpldapadmin.rule=Host(`${PHPLDAPADMIN_DOMAIN:?Domain for PHPLDAPAdmin must be set!}`)"
             - "traefik.http.routers.phpldapadmin.entrypoints=secure"
-            - "traefik.http.routers.phpldapadmin.tls.certresolver=le"
+            # - "traefik.http.routers.phpldapadmin.tls.certresolver=le"
+            - "traefik.http.routers.phpldapadmin.tls=true"
 
+    ###############################
+    #           Graylog           #
+    ###############################
+    graylog:
+        image: graylog/graylog:3.2
+        container_name: graylog
+        environment:
+            # CHANGE ME (must be at least 16 characters)!
+            - GRAYLOG_PASSWORD_SECRET=${GRAYLOG_SECRET}
+            - GRAYLOG_ROOT_PASSWORD_SHA2
+            - GRAYLOG_HTTP_EXTERNAL_URI=https://${GRAYLOG_DOMAIN}
+        networks:
+            - graylog
+            - proxy
+        depends_on:
+            - graylog-db
+            - graylog-elasticsearch
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.graylog.rule=Host(`${GRAYLOG_DOMAIN:?Domain for Graylog must be set!}`)"
+            - "traefik.http.routers.graylog.entrypoints=secure"
+            - "traefik.http.services.graylog.loadbalancer.server.port=9000"
+            - "traefik.http.routers.graylog.tls.certresolver=le"
+        ports:
+            # Syslog TCP
+            - 1514:1514
+            # Syslog UDP
+            - 1514:1514/udp
+            # GELF TCP
+            - 12201:12201
+            # GELF UDP
+            - 12201:12201/udp
+
+    graylog-db:
+        image: mongo:3
+        container_name: graylog-db
+        restart: unless-stopped
+        networks:
+            - graylog
+
+    graylog-elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.8.5
+        container_name: graylog-elasticsearch
+        restart: unless-stopped
+        environment:
+            - http.host=0.0.0.0
+            - transport.host=localhost
+            - network.host=0.0.0.0
+            - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+        ulimits:
+            memlock:
+                soft: -1
+                hard: -1
+        deploy:
+            resources:
+                limits:
+                memory: 1g
+        networks:
+            - graylog
     ###############################
     #           Jaeger            #
     ###############################
@@ -807,26 +838,6 @@ services:
     #         - ${SERVICES_ROOT}/${ORGANIZR_ROOT:-organizr}/db:/db
     #     restart: unless-stopped
 
-    # ###############################
-    # #           Muximux          #
-    # ###############################
-    # muximux:
-    #     image: linuxserver/muximux
-    #     container_name: muximux
-    #     environment:
-    #         - PUID=1000
-    #         - PGID=1000
-    #         - TZ
-    #     networks:
-    #         - proxy
-    #     labels:
-    #         - "traefik.enable=true"
-    #         - "traefik.http.routers.muximux.rule=Host(`${MUXIMUX_DOMAIN:?Domain for Muximux must be set!}`)"
-    #         - "traefik.http.routers.muximux.entrypoints=secure"
-    #         - "traefik.http.routers.muximux.tls.certresolver=le"
-    #     volumes:
-    #         - ${SERVICES_ROOT}/${MUXIMUX_ROOT:-muximux}:/config
-    #     restart: unless-stopped
     ###############################
     #           Ombi              #
     ###############################
@@ -847,6 +858,7 @@ services:
     #     volumes:
     #         - ${SERVICES_ROOT}/${OMBI_ROOT:-ombi}:/config
     #     restart: unless-stopped
+
     ###############################
     #           Mastadon          #
     ###############################
@@ -1888,128 +1900,63 @@ services:
     #         - prosody
     #     networks:
     #         meet.jitsi:
+
+    ## VPN and all of the "bad" stuff is blocked until we can
+    ## redirect requests from Traefik to the bridged network
     ###############################
     #           NordVPN           #
     ###############################
         # https://github.com/bubuntux/nordvpn
-    vpn:
-        image: bubuntux/nordvpn
-        network_mode: bridge
-        cap_add:
-            - net_admin
-        devices:
-            - /dev/net/tun
-        environment:
-            - USER=${NORDVPN_USERNAME}
-            - PASS=${NORDVPN_PASSWORD}
-            - CONNECT=United_States
-            - TECHNOLOGY=NordLynx
-            - NETWORK=192.168.1.0/24
-            - TZ
-        restart: unless-stopped
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.transmission.rule=Host(`${TRANSMISSION_DOMAIN:?Domain for Transmission must be set!}`)"
-            - "traefik.http.services.transmission.loadbalancer.server.port=9091"
-            - "traefik.http.routers.transmission.entrypoints=secure"
-            # - "traefik.http.routers.transmission.middlewares=authelia@docker"
-            - "traefik.http.routers.transmission.tls.certresolver=le"
+    # vpn:
+    #     image: bubuntux/nordvpn
+    #     network_mode: bridge
+    #     container_name: vpn
+    #     ports:
+    #         - "9091:9091"
+    #     cap_add:
+    #         - net_admin
+    #     devices:
+    #         - /dev/net/tun
+    #     environment:
+    #         - USER=${NORDVPN_USERNAME}
+    #         - PASS=${NORDVPN_PASSWORD}
+    #         - CONNECT=United_States
+    #         - TECHNOLOGY=NordLynx
+    #         - NETWORK=192.168.1.0/24
+    #         - TZ
+    #     restart: unless-stopped
 
     ###############################
     #         Transmission        #
     ###############################
-    transmission:
-        image: linuxserver/transmission
-        container_name: transmission
-        restart: unless-stopped
-        network_mode: service:vpn
-        # networks:
-        #     - proxy
-        #     - exporters
-        depends_on:
-            - traefik
-            - vpn
-        environment:
-            - PUID=${UID:-1000}
-            - PGID=${GID:-1000}
-            - TZ
-        # expose:
-        #     - 9091
-        # ports:
-        #     - 51413:51413
-        #     - 51413:51413/udp
-        volumes:
-            - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/config:/config
-            - ${DOWNLOADS_ROOT}:/downloads
-            - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/torrentfiles:/watch
-        
-    transmission-exporter:
-        image: metalmatze/transmission-exporter
-        container_name: transmission-exporter
-        restart: always
-        networks:
-            - exporters
-        ports:
-            - "127.0.0.1:19091:19091"
-        environment:
-            TRANSMISSION_ADDR: http://transmission:9091
-    # ###############################
-    # #           Graylog           #
-    # ###############################
-    # graylog:
-    #     image: graylog/graylog:3.2
-    #     container_name: graylog
-    #     environment:
-    #         # CHANGE ME (must be at least 16 characters)!
-    #         - GRAYLOG_PASSWORD_SECRET=${GRAYLOG_SECRET}
-    #         - GRAYLOG_ROOT_PASSWORD_SHA2
-    #         - GRAYLOG_HTTP_EXTERNAL_URI=https://${GRAYLOG_DOMAIN}
-    #     networks:
-    #         - graylog
-    #         - proxy
+    # transmission:
+    #     image: linuxserver/transmission
+    #     container_name: transmission
+    #     restart: unless-stopped
+    #     network_mode: service:vpn
     #     depends_on:
-    #         - graylog-db
-    #         - graylog-elasticsearch
-    #     labels:
-    #         - "traefik.enable=true"
-    #         - "traefik.http.routers.graylog.rule=Host(`${GRAYLOG_DOMAIN:?Domain for Graylog must be set!}`)"
-    #         - "traefik.http.routers.graylog.entrypoints=secure"
-    #         - "traefik.http.services.graylog.loadbalancer.server.port=9000"
-    #         - "traefik.http.routers.graylog.tls.certresolver=le"
-    #     ports:
-    #         # Syslog TCP
-    #         - 1514:1514
-    #         # Syslog UDP
-    #         - 1514:1514/udp
-    #         # GELF TCP
-    #         - 12201:12201
-    #         # GELF UDP
-    #         - 12201:12201/udp
-    # graylog-db:
-    #     image: mongo:3
-    #     container_name: graylog-db
-    #     restart: unless-stopped
-    #     networks:
-    #         - graylog
-    # graylog-elasticsearch:
-    #     image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.8.5
-    #     container_name: graylog-elasticsearch
-    #     restart: unless-stopped
+    #         - traefik
+    #         - vpn
     #     environment:
-    #         - http.host=0.0.0.0
-    #         - transport.host=localhost
-    #         - network.host=0.0.0.0
-    #         - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    #     ulimits:
-    #         memlock:
-    #             soft: -1
-    #             hard: -1
-    #     deploy:
-    #         resources:
-    #             limits:
-    #             memory: 1g
+    #         - PUID=${UID:-1000}
+    #         - PGID=${GID:-1000}
+    #         - TZ
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/config:/config
+    #         - ${DOWNLOADS_ROOT}:/downloads
+    #         - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/torrentfiles:/watch
+        
+    # transmission-exporter:
+    #     image: metalmatze/transmission-exporter
+    #     container_name: transmission-exporter
+    #     restart: always
     #     networks:
-    #         - graylog
+    #         - exporters
+    #     ports:
+    #         - "127.0.0.1:19091:19091"
+    #     environment:
+    #         TRANSMISSION_ADDR: http://transmission:9091
+    # #
     # ###############################
     # #         Guacamole           #
     # ###############################
