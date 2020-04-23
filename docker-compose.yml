@@ -76,6 +76,9 @@ services:
     #         - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
     #         - "traefik.http.routers.prometheus.tls.certresolver=le"
 
+    # node-exporter:
+    #     image: prom/node-exporter
+    #     container_name: node-exporter
     # ###############################
     # #          Grafana            #
     # ###############################
@@ -268,9 +271,6 @@ services:
             - ./configs/openldap/seeds:/container/service/slapd/assets/config/bootstrap/ldif/custom
             - ${SERVICES_ROOT}/${OPENLDAP_ROOT:-openldap}/db:/var/lib/ldap
             - ${SERVICES_ROOT}/${OPENLDAP_ROOT:-openldap}/config:/etc/ldap/slap.d
-        # expose:
-        #     - 389
-        #     - 636
         ports:
             - "389:389"
             - "636:636"
@@ -1138,57 +1138,58 @@ services:
     # ###############################
     # #        Calibre              #
     # ###############################
-    calibre-web:
-        image: technosoft2000/calibre-web
-        container_name: calibre-web
-        restart: unless-stopped
-        networks:
-            - proxy
-        environment:
-            - PGID=1000
-            - PUID=1000
-            - USE_CONFIG_DIR=true
-        expose:
-            - 8083
-        volumes:
-            - /etc/localtime:/etc/localtime:ro
-            - ${BOOKS_ROOT}:/books
-            - ${SERVICES_ROOT}/${CALIBRE_WEB_ROOT:-calibre-web}/config:/calibre-web/config
-            - ${SERVICES_ROOT}/${CALIBRE_WEB_ROOT:-calibre-web}/kindlegen:/calibre-web/kindlegen
-            - ${SERVICES_ROOT}/${CALIBRE_WEB_ROOT:-calibre-web}/app:/calibre-web/app
-            - ${SERVICES_ROOT}/${CALIBRE_WEB_ROOT:-calibre-web}/db:/calibre-web/db
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.calibre-web.rule=Host(`${CALIBRE_WEB_DOMAIN:?Domain for Calibre-web must be set!}`)"
-            - "traefik.http.routers.calibre-web.entrypoints=secure"
-            - "traefik.http.services.calibre-web.loadbalancer.server.port=8083"
-            - "traefik.http.routers.calibre-web.tls=true"
+    # calibre-web:
+    #     image: technosoft2000/calibre-web
+    #     container_name: calibre-web
+    #     restart: unless-stopped
+    #     networks:
+    #         - proxy
+    #     environment:
+    #         - PGID=1000
+    #         - PUID=1000
+    #         - USE_CONFIG_DIR=true
+    #     expose:
+    #         - 8083
+    #     volumes:
+    #         - /etc/localtime:/etc/localtime:ro
+    #         - ${BOOKS_ROOT}:/books
+    #         - ${SERVICES_ROOT}/${CALIBRE_WEB_ROOT:-calibre-web}/config:/calibre-web/config
+    #         - ${SERVICES_ROOT}/${CALIBRE_WEB_ROOT:-calibre-web}/kindlegen:/calibre-web/kindlegen
+    #         - ${SERVICES_ROOT}/${CALIBRE_WEB_ROOT:-calibre-web}/app:/calibre-web/app
+    #         - ${SERVICES_ROOT}/${CALIBRE_WEB_ROOT:-calibre-web}/db:/calibre-web/db
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.calibre-web.rule=Host(`${CALIBRE_WEB_DOMAIN:?Domain for Calibre-web must be set!}`)"
+    #         - "traefik.http.routers.calibre-web.entrypoints=secure"
+    #         - "traefik.http.services.calibre-web.loadbalancer.server.port=8083"
+    #         - "traefik.http.routers.calibre-web.tls=true"
     # ###############################
     # #        Airsonic .           #
     # ###############################
-    airsonic:
-        image: linuxserver/airsonic
-        container_name: airsonic
-        networks:
-            - proxy
-        environment:
-            - PUID=1000
-            - PGID=1000
-            - TZ
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.airsonic.rule=Host(`${AIRSONIC_DOMAIN:?Domain for Airsonic must be set!}`)"
-            - "traefik.http.routers.airsonic.entrypoints=secure"
-            - "traefik.http.services.airsonic.loadbalancer.server.port=4040"
-            - "traefik.http.routers.airsonic.tls=true"
-        volumes:
-            - ./configs/airsonic/airsonic.properties:/var/lib/docker/volumes/data/_data/airsonic.properties
-            - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/config:/config
-            - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/music:/music
-            - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/playlists:/playlists
-            - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/podcasts:/podcasts
-            - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/media:/media
-        restart: unless-stopped
+    # airsonic:
+    #     image: linuxserver/airsonic
+    #     container_name: airsonic
+    #     networks:
+    #         - proxy
+    #     environment:
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - TZ
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.airsonic.rule=Host(`${AIRSONIC_DOMAIN:?Domain for Airsonic must be set!}`)"
+    #         - "traefik.http.routers.airsonic.entrypoints=secure"
+    #         - "traefik.http.services.airsonic.loadbalancer.server.port=4040"
+    #         - "traefik.http.routers.airsonic.tls=true"
+    #     volumes:
+    #         # - ./configs/airsonic/airsonic.properties:/var/lib/docker/volumes/data/_data/airsonic.properties
+    #         - ./configs/airsonic/airsonic.properties:/config/airsonic.properties
+    #         - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/config:/config
+    #         - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/music:/music
+    #         - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/playlists:/playlists
+    #         - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/podcasts:/podcasts
+    #         - ${SERVICES_ROOT}/${AIRSONIC_ROOT:-airsonic}/media:/media
+    #     restart: unless-stopped
     ###############################
     #           Wekan             #
     ###############################

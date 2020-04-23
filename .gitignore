@@ -2,6 +2,6 @@
 configuration.yml
 airsonic.properties
 env.yaml
-51-addgroups.ldif
-50-addusers.ldif
+98-addgroups.ldif
+97-addusers.ldif
 providers.env
