@@ -72,7 +72,7 @@ services:
     #         - "traefik.enable=true"
     #         - "traefik.http.routers.prometheus.rule=Host(`${PROMETHEUS_DOMAIN:?Domain for Prometheus must be set!}`)"
     #         - "traefik.http.routers.prometheus.entrypoints=secure"
-    #         - "traefik.http.routers.prometheus.middlewares=authelia@docker"
+    #         - "traefik.http.routers.prometheus.middlewares=authelia@file"
     #         - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
     #         - "traefik.http.routers.prometheus.tls.certresolver=le"
 
@@ -140,6 +140,7 @@ services:
     ###############################
     #           Portainer         #
     ###############################
+    # https://github.com/portainer/portainer/issues/3125
     portainer:
         image: portainer/portainer
         container_name: portainer
@@ -563,7 +564,7 @@ services:
     #         - "traefik.http.services.embystats.loadbalancer.server.port=6555"
     #         - "traefik.http.routers.embystats.rule=Host(`${EMBYSTATS_DOMAIN:?Domain for Embystats must be set!}`)"
     #         - "traefik.http.routers.embystats.entrypoints=secure"
-    #         - "traefik.http.routers.embystats.middleware=authelia@docker"
+    #         - "traefik.http.routers.embystats.middleware=authelia@file"
     #         - "traefik.http.routers.embystats.tls.certresolver=le"
     # # ###############################
     # # #           Jellyfin          #
@@ -678,7 +679,7 @@ services:
     #         - "traefik.enable=true"
     #         - "traefik.http.routers.qbitorrent.rule=Host(`${QBITORRENT_DOMAIN:?Domain for qBitorrent must be set!}`)"
     #         - "traefik.http.routers.qbitorrent.entrypoints=secure"
-    #         - "traefik.http.routers.qbitorrent.middlewares=authelia@docker"
+    #         - "traefik.http.routers.qbitorrent.middlewares=authelia@file"
     #         - "traefik.http.routers.qbitorrent.tls.certresolver=le"
     #     restart: unless-stopped
     
@@ -2177,7 +2178,7 @@ services:
     #         - "traefik.http.routers.radarr.entrypoints=secure"
     #         - "traefik.http.services.radarr.loadbalancer.server.port=7878"
     #         - "traefik.http.routers.radarr.tls.certresolver=le"
-    #         - "traefik.http.routers.radarr.middlewares=authelia@docker"
+    #         - "traefik.http.routers.radarr.middlewares=authelia@file"
     #     restart: unless-stopped
     # ###############################
     # #         Lidarr              #
@@ -2201,7 +2202,7 @@ services:
     #         - "traefik.http.routers.lidarr.entrypoints=secure"
     #         - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
     #         - "traefik.http.routers.lidarr.tls.certresolver=le"
-    #         - "traefik.http.routers.lidarr.middlewares=authelia@docker"
+    #         - "traefik.http.routers.lidarr.middlewares=authelia@file"
     #     restart: unless-stopped
     # ###############################
     # #         Sonarr              #
@@ -2225,7 +2226,7 @@ services:
     #         - "traefik.http.routers.sonarr.entrypoints=secure"
     #         - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
     #         - "traefik.http.routers.sonarr.tls.certresolver=le"
-    #         - "traefik.http.routers.sonarr.middlewares=authelia@docker"
+    #         - "traefik.http.routers.sonarr.middlewares=authelia@file"
     #     restart: unless-stopped
     # ###############################
     # #         Jackett             #
@@ -2248,7 +2249,7 @@ services:
     #         - "traefik.http.routers.jackett.entrypoints=secure"
     #         - "traefik.http.services.jackett.loadbalancer.server.port=9117"
     #         - "traefik.http.routers.jackett.tls.certresolver=le"
-    #         - "traefik.http.routers.jackett.middlewares=authelia@docker"
+    #         - "traefik.http.routers.jackett.middlewares=authelia@file"
     #     restart: unless-stopped
     # ###############################
     # #         Beets               #
@@ -2273,7 +2274,7 @@ services:
     #         - "traefik.http.routers.beets.entrypoints=secure"
     #         - "traefik.http.services.beets.loadbalancer.server.port=8337"
     #         - "traefik.http.routers.beets.tls.certresolver=le"
-    #         - "traefik.http.routers.beets.middlewares=authelia@docker"
+    #         - "traefik.http.routers.beets.middlewares=authelia@file"
     #     restart: unless-stopped
     # ###############################
     # #         Tdarr               #
@@ -2292,7 +2293,7 @@ services:
     #         - "traefik.http.routers.tdarr.entrypoints=secure"
     #         - "traefik.http.services.tdarr.loadbalancer.server.port=8337"
     #         - "traefik.http.routers.tdarr.tls.certresolver=le"
-    #         - "traefik.http.routers.tdarr.middlewares=authelia@docker"
+    #         - "traefik.http.routers.tdarr.middlewares=authelia@file"
     #     restart: unless-stopped
     # tdarr-db:
     #     image: mongo:latest
@@ -2327,5 +2328,5 @@ services:
     #         - "traefik.http.routers.sabnzbd.entrypoints=secure"
     #         - "traefik.http.services.sabnzbd.loadbalancer.server.port=8080"
     #         - "traefik.http.routers.sabnzbd.tls.certresolver=le"
-    #         - "traefik.http.routers.sabnzbd.middlewares=authelia@docker"
+    #         - "traefik.http.routers.sabnzbd.middlewares=authelia@file"
     #     restart: unless-stopped

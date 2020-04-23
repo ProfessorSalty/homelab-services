@@ -6,12 +6,21 @@ start_tls = false
 ssl_skip_verify = false
 bind_dn = "cn=admin,${LDAP_LOGIN_BASE}"
 bind_password = '${LDAP_ADMIN_PASSWORD}'
-search_filter = "(cn=%s)"
+search_filter = "(uid=%s)"
 search_base_dns = ["${LDAP_LOGIN_BASE}"]
 
 [servers.attributes]
-name = "givenName"
+name = "displayName"
 surname = "sn"
-username = "cn"
+username = "uid"
 member_of = "memberOf"
 email =  "email"
+
+[[servers.group_mappings]]
+group_dn = "cn=administrator,ou=groups,${LDAP_LOGIN_BASE}"
+org_role = "Admin"
+grafana_admin = true # Available in Grafana v5.3 and above
+
+[[servers.group_mappings]]
+group_dn = "cn=everybody,ou=groups,${LDAP_LOGIN_BASE}"
+org_role = "Viewer"
