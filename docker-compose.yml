@@ -794,178 +794,185 @@ services:
     #         - ${SERVICES_ROOT}/${OMBI_ROOT:-ombi}:/config
     #     restart: unless-stopped
 
-    # ###############################
-    # #           Mastodon          #
-    # ###############################
-    # mastodon-web: 
-    #     image: tootsuite/mastodon
-    #     container_name: mostodon-web
-    #     restart: always
-    #     command: bash -c "rm -f /mastodon/tmp/pids/server.pid; bundle exec rails s -p 3000"
-    #     environment:
-    #         - RAILS_ENV=production
-    #         - SECRET_KEY_BASE=${MASTODON_SECRET_KEY_BASE}
-    #         - OTP_SECRET=${MASTODON_OTP_SECRET}
-    #         - DB_HOST=mastodon-db
-    #         - DB_USER=mastodon
-    #         - DB_NAME=mastodon
-    #         - DB_PASS=${MASTODON_DB_PASSWORD}
-    #         - REDIS_HOST=mastodon-cache
-    #         # - CACHE_REDIS_HOST=mastodon-cache
-    #         # - ES_ENABLED=true
-    #         # - ES_HOST=mastodon-elasticsearch
-    #         - LDAP_ENABLED=true
-    #         - LDAP_HOST=openldap
-    #         - LDAP_BASE=${LDAP_LOGIN_BASE}
-    #         - LDAP_BIND_DN=admin,${LDAP_LOGIN_BASE}
-    #         - LDAP_PASSWORD=${LDAP_ADMIN_PASSWORD}
-    #         - LDAP_UID=uid
-    #         # - LDAP_SEARCH_FILTER
-    #         # - SMTP_SERVER
-    #         # - SMTP_PORT
-    #         # - SMTP_LOGIN
-    #         # - SMTP_PASSWORD
-    #         # - SMTP_FROM_ADDRESS
-    #         # - SMTP_TLS
-    #         # - SMTP_AUTH_METHOD
-    #         # - SMTP_DOMAIN
-    #         # - STATSD_ADDR
-    #         # - STATSD_NAMESPACE
+    ###############################
+    #           Mastodon          #
+    ###############################
+    mastodon-web: 
+        build: ./mastodon
+        image: tootsuite/mastodon
+        container_name: mostodon-web
+        restart: always
+        command: bash -c "rm -f /mastodon/tmp/pids/server.pid; bundle exec rails s -p 3000"
+        environment:
+            - LOCAL_DOMAIN=${MASTODON_DOMAIN}
+            - RAILS_ENV=production
+            - SECRET_KEY_BASE=${MASTODON_SECRET_KEY_BASE}
+            - OTP_SECRET=${MASTODON_OTP_SECRET}
+            - DB_HOST=mastodon-db
+            - DB_USER=mastodon
+            - DB_NAME=mastodon
+            - DB_PASS=${MASTODON_DB_PASSWORD}
+            - REDIS_HOST=mastodon-cache
+            # - CACHE_REDIS_HOST=mastodon-cache
+            # - ES_ENABLED=true
+            # - ES_HOST=mastodon-elasticsearch
+            - LDAP_ENABLED=true
+            - LDAP_HOST=openldap
+            - LDAP_BASE=${LDAP_LOGIN_BASE}
+            - LDAP_BIND_DN=admin,${LDAP_LOGIN_BASE}
+            - LDAP_PASSWORD=${LDAP_ADMIN_PASSWORD}
+            - LDAP_UID=uid
+            - LDAP_TLS_NO_VERIFY=tfalserue
+            # - LDAP_SEARCH_FILTER
+            # - SMTP_SERVER
+            # - SMTP_PORT
+            # - SMTP_LOGIN
+            # - SMTP_PASSWORD
+            # - SMTP_FROM_ADDRESS
+            # - SMTP_TLS
+            # - SMTP_AUTH_METHOD
+            # - SMTP_DOMAIN
+            # - STATSD_ADDR
+            # - STATSD_NAMESPACE
+        networks:
+            - proxy
+            - mastodon
+        depends_on:
+            - mastodon-db
+            - mastodon-cache
+            # - mastodon-search
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.mastodon-web.rule=Host(`${MASTODON_DOMAIN:?Domain for Mastodon must be set!}`)"
+            - "traefik.http.routers.mastodon-web.entrypoints=secure"
+            - "traefik.http.services.mastodon-web.loadbalancer.server.port=3000"
+            - "traefik.http.routers.mastodon-web.tls=true"
+        volumes:
+            - ${SERVICES_ROOT}/${MASTODON_ROOT:-mastodon}/public/system:/mastodon/public/system
 
-    #     networks:
-    #         - proxy
-    #         - mastodon
-    #     depends_on:
-    #         - mastodon-db
-    #         - mastodon-cache
-    #         # - mastodon-search
-    #     labels:
-    #         - "traefik.enable=true"
-    #         - "traefik.http.routers.mastodon-web.rule=Host(`${MASTODON_DOMAIN:?Domain for Mastodon must be set!}`)"
-    #         - "traefik.http.routers.mastodon-web.entrypoints=secure"
-    #         - "traefik.http.services.mastodon-web.loadbalancer.server.port=3000"
-    #         - "traefik.http.routers.mastodon-web.tls=true"
-    #     volumes:
-    #         - ${SERVICES_ROOT}/${MASTODON_ROOT:-mastodon}/public/system:/mastodon/public/system
+    mastodon-streaming: 
+        build: ./mastodon
+        image: tootsuite/mastodon
+        container_name: mastodon-streaming
+        restart: always
+        command: node ./streaming
+        expose:
+            - 4000
+        environment:
+            - LOCAL_DOMAIN=${MASTODON_DOMAIN}
+            - SINGLE_USER_MODE=false
+            - SECRET_KEY_BASE=${MASTODON_SECRET_KEY_BASE}
+            - OTP_SECRET=${MASTODON_OTP_SECRET}
+            - DB_HOST=mastodon-db
+            - DB_USER=mastodon
+            - DB_PORT=5432
+            - DB_NAME=mastodon
+            - DB_PASS=${MASTODON_DB_PASSWORD}
+            - REDIS_HOST=mastodon-cache
+            - REDIS_PORT=6379
+            # - REDIS_PASSWORD=
+            # - CACHE_REDIS_HOST=mastodon-cache
+            # - ES_ENABLED=true
+            # - ES_HOST=mastodon-search
+            - LDAP_ENABLED=true
+            - LDAP_HOST=openldap
+            - LDAP_BASE=${LDAP_LOGIN_BASE}
+            - LDAP_BIND_DN=admin,${LDAP_LOGIN_BASE}
+            - LDAP_PASSWORD=${LDAP_ADMIN_PASSWORD}
+            - LDAP_UID=uid
+            - LDAP_METHOD=simple
+            - LDAP_TLS_NO_VERIFY=false
+            # - LDAP_SEARCH_FILTER=(|(%{uid}=%{email})(%{mail}=%{email}))
+            # - SMTP_SERVER
+            # - SMTP_PORT
+            # - SMTP_LOGIN
+            # - SMTP_PASSWORD
+            # - SMTP_FROM_ADDRESS
+            # - SMTP_TLS
+            # - SMTP_AUTH_METHOD
+            # - SMTP_DOMAIN
+            # - STATSD_ADDR
+            # - STATSD_NAMESPACE
+        networks:
+            - proxy
+            - mastodon
+        depends_on:
+            - mastodon-db
+            - mastodon-cache
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.mastodon-streaming.rule=(Host(`MASTODON_DOMAIN`) && PathPrefix(`/api/v1/streaming`))"
+            - "traefik.http.routers.mastodon-streaming.entrypoints=secure"
+            - "traefik.http.services.mastodon-streaming.loadbalancer.server.port=4000"
+            - "traefik.http.routers.mastodon-streaming.tls=true"
 
-    # mastodon-streaming: 
-    #     image: tootsuite/mastodon
-    #     container_name: mastodon-streaming
-    #     restart: always
-    #     command: node ./streaming
-    #     expose:
-    #         - 4000
-    #     environment:
-    #         - LOCAL_DOMAIN=${MASTODON_DOMAIN}
-    #         - SINGLE_USER_MODE=false
-    #         - SECRET_KEY_BASE=${MASTODON_SECRET_KEY_BASE}
-    #         - OTP_SECRET=${MASTODON_OTP_SECRET}
-    #         - DB_HOST=mastodon-db
-    #         - DB_USER=mastodon
-    #         - DB_PORT=5432
-    #         - DB_NAME=mastodon
-    #         - DB_PASS=${MASTODON_DB_PASSWORD}
-    #         - REDIS_HOST=mastodon-cache
-    #         - REDIS_PORT=6379
-    #         # - REDIS_PASSWORD=
-    #         # - CACHE_REDIS_HOST=mastodon-cache
-    #         # - ES_ENABLED=true
-    #         # - ES_HOST=mastodon-search
-    #         - LDAP_ENABLED=true
-    #         - LDAP_HOST=openldap
-    #         - LDAP_BASE=${LDAP_LOGIN_BASE}
-    #         - LDAP_BIND_DN=admin,${LDAP_LOGIN_BASE}
-    #         - LDAP_PASSWORD=${LDAP_ADMIN_PASSWORD}
-    #         - LDAP_UID=uid
-    #         - LDAP_METHOD=simple
-    #         - LDAP_TLS_NO_VERIFY=true
-    #         # - LDAP_SEARCH_FILTER=(|(%{uid}=%{email})(%{mail}=%{email}))
-    #         # - SMTP_SERVER
-    #         # - SMTP_PORT
-    #         # - SMTP_LOGIN
-    #         # - SMTP_PASSWORD
-    #         # - SMTP_FROM_ADDRESS
-    #         # - SMTP_TLS
-    #         # - SMTP_AUTH_METHOD
-    #         # - SMTP_DOMAIN
-    #         # - STATSD_ADDR
-    #         # - STATSD_NAMESPACE
-    #     networks:
-    #         - proxy
-    #         - mastodon
-    #     depends_on:
-    #         - mastodon-db
-    #         - mastodon-cache
-    #     labels:
-    #         - "traefik.enable=true"
-    #         - "traefik.http.routers.mastodon-streaming.rule=(Host(`MASTODON_DOMAIN`) && PathPrefix(`/api/v1/streaming`))"
-    #         - "traefik.http.routers.mastodon-streaming.entrypoints=secure"
-    #         - "traefik.http.services.mastodon-streaming.loadbalancer.server.port=4000"
-    #         - "traefik.http.routers.mastodon-streaming.tls=true"
+    mastodon-sidekiq:
+        build: ./mastodon
+        image: tootsuite/mastodon
+        container_name: mastodon-sidekiq
+        restart: always
+        command: bundle exec sidekiq
+        environment:
+            - LOCAL_DOMAIN=${MASTODON_DOMAIN}
+            - SECRET_KEY_BASE=${MASTODON_SECRET_KEY_BASE}
+            - OTP_SECRET=${MASTODON_OTP_SECRET}
+            - DB_HOST=mastodon-db
+            - DB_USER=mastodon
+            - DB_NAME=mastodon
+            - DB_PASS=${MASTODON_DB_PASSWORD}
+            - REDIS_HOST=mastodon-cache
+            # - CACHE_REDIS_HOST=mastodon-cache
+            # - ES_ENABLED=true
+            # - ES_HOST=mastodon-search
+            - LDAP_ENABLED=true
+            - LDAP_HOST=openldap
+            - LDAP_BASE=ou=people,${LDAP_LOGIN_BASE}
+            - LDAP_BIND_DN=admin,${LDAP_LOGIN_BASE}
+            - LDAP_PASSWORD=${LDAP_ADMIN_PASSWORD}
+            - LDAP_UID=uid
+            - LDAP_TLS_NO_VERIFY=true
+            # - LDAP_SEARCH_FILTER
+            # - SMTP_SERVER
+            # - SMTP_PORT
+            # - SMTP_LOGIN
+            # - SMTP_PASSWORD
+            # - SMTP_FROM_ADDRESS
+            # - SMTP_TLS
+            # - SMTP_AUTH_METHOD
+            # - SMTP_DOMAIN
+            # - STATSD_ADDR
+            # - STATSD_NAMESPACE
+        depends_on:
+            - mastodon-db
+            - mastodon-cache
+            - traefik
+        networks:
+            - proxy
+            - mastodon
+        volumes:
+            - ${SERVICES_ROOT}/${MASTODON_ROOT:-mastodon}/public/system:/mastodon/public/system
 
-    # mastodon-sidekiq:
-    #     image: tootsuite/mastodon
-    #     container_name: mastodon-sidekiq
-    #     restart: always
-    #     command: bundle exec sidekiq
-    #     environment:
-    #         - SECRET_KEY_BASE=${MASTODON_SECRET_KEY_BASE}
-    #         - OTP_SECRET=${MASTODON_OTP_SECRET}
-    #         - DB_HOST=mastodon-db
-    #         - DB_USER=mastodon
-    #         - DB_NAME=mastodon
-    #         - DB_PASS=${MASTODON_DB_PASSWORD}
-    #         - REDIS_HOST=mastodon-cache
-    #         # - CACHE_REDIS_HOST=mastodon-cache
-    #         # - ES_ENABLED=true
-    #         # - ES_HOST=mastodon-search
-    #         - LDAP_ENABLED=true
-    #         - LDAP_HOST=openldap
-    #         - LDAP_BASE=${LDAP_LOGIN_BASE}
-    #         - LDAP_BIND_DN=admin,${LDAP_LOGIN_BASE}
-    #         - LDAP_PASSWORD=${LDAP_ADMIN_PASSWORD}
-    #         - LDAP_UID=uid
-    #         # - LDAP_SEARCH_FILTER
-    #         # - SMTP_SERVER
-    #         # - SMTP_PORT
-    #         # - SMTP_LOGIN
-    #         # - SMTP_PASSWORD
-    #         # - SMTP_FROM_ADDRESS
-    #         # - SMTP_TLS
-    #         # - SMTP_AUTH_METHOD
-    #         # - SMTP_DOMAIN
-    #         # - STATSD_ADDR
-    #         # - STATSD_NAMESPACE
-    #     depends_on:
-    #         - mastodon-db
-    #         - mastodon-cache
-    #         - traefik
-    #     networks:
-    #         - proxy
-    #         - mastodon
-    #     volumes:
-    #         - ${SERVICES_ROOT}/${MASTODON_ROOT:-mastodon}/public/system:/mastodon/public/system
+    mastodon-db:
+        image: postgres:9.6-alpine
+        container_name: mastodon-db
+        restart: unless-stopped
+        shm_size: 256mb
+        networks:
+            - mastodon
+        environment:
+            - POSTGRES_DB=mastodon
+            - POSTGRES_USER=mastodon
+            - POSTGRES_PASSWORD=${MASTODON_DB_PASSWORD:?Password for Mastodon db must be set}
+            - TZ
+        volumes:
+            - ${SERVICES_ROOT}/${MASTODON_ROOT:-mastodon}/db:/var/lib/postgresql/data
 
-    # mastodon-db:
-    #     image: postgres:9.6-alpine
-    #     container_name: mastodon-db
-    #     restart: unless-stopped
-    #     networks:
-    #         - mastodon
-    #     environment:
-    #         - POSTGRES_DB=mastodon
-    #         - POSTGRES_USER=mastodon
-    #         - POSTGRES_PASSWORD=${MASTODON_DB_PASSWORD:?Password for Mastodon db must be set}
-    #         - TZ
-    #     volumes:
-    #         - ${SERVICES_ROOT}/${MASTODON_ROOT:-mastodon}/db:/var/lib/postgresql/data
-
-    # mastodon-cache:
-    #     restart: always
-    #     container_name: mastodon-cache
-    #     image: redis:5.0-alpine
-    #     networks:
-    #         - mastodon
+    mastodon-cache:
+        restart: always
+        container_name: mastodon-cache
+        image: redis:5.0-alpine
+        networks:
+            - mastodon
 
     # mastodon-search:
     #     restart: always
