@@ -31,3 +31,6 @@ http:
       forwardAuth: 
         address: http://authelia:9091/api/verify?rd=https://{{ env "AUTHELIA_DOMAIN" }}
       trustForwardHeader: true
+    guacamole:
+      addPrefix:
+        prefix: /guacamole
