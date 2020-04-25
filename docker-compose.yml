@@ -24,6 +24,7 @@ networks:
     guacamole:
     calibre:
     friendica:
+    bitwarden:
 
 volumes:
     nextcloud:
@@ -236,7 +237,7 @@ services:
         networks:
             - proxy
         ports:
-            - "${TRAEFIK_HTTP_PORT:-80}:80" 
+            - "${TRAEFIK_HTTP_PORT:-80}:80"
             - "${TRAEFIK_HTTPS_PORT:-443}:443"
         volumes:
             - ./configs/traefik/static.yml:/traefik.yml
@@ -279,9 +280,8 @@ services:
             - proxy
         command: --copy-service
 
-
     ###############################
-    #       PHPLDAPAdmin          #         
+    #       PHPLDAPAdmin          #
     ###############################
 
     phpldapadmin:
@@ -295,13 +295,13 @@ services:
             PHPLDAPADMIN_HTTPS: "false"
             PHPLDAPADMIN_LDAP_HOSTS: "#PYTHON2BASH:[
                 {'openldap': [
-                    {'server': [{'tls': False}]},
-                    {'login': [
-                            {'bind_id': 'cn=admin,${LDAP_LOGIN_BASE}'},
-                            {'bind_pass': '${LDAP_ADMIN_PASSWORD}'},
-                            {'attr': 'cn'}
-                        ]
-                    }]}]"
+                {'server': [{'tls': False}]},
+                {'login': [
+                {'bind_id': 'cn=admin,${LDAP_LOGIN_BASE}'},
+                {'bind_pass': '${LDAP_ADMIN_PASSWORD}'},
+                {'attr': 'cn'}
+                ]
+                }]}]"
         labels:
             - "traefik.enable=true"
             - "traefik.http.routers.phpldapadmin.rule=Host(`${PHPLDAPADMIN_DOMAIN:?Domain for PHPLDAPAdmin must be set!}`)"
@@ -551,7 +551,7 @@ services:
     #         - "traefik.http.routers.jellyfin.rule=Host(`${JELLYFIN_DOMAIN:?Domain for Jellyfin must be set!}`)"
     #         - "traefik.http.routers.jellyfin.entrypoints=secure"
     #         - "traefik.http.routers.jellyfin.tls=true"
-    
+
     # ###############################
     # #           Gitea             #
     # ###############################
@@ -601,8 +601,7 @@ services:
     #         - TZ
     #     volumes:
     #         - ${SERVICES_ROOT}/${GITEA_ROOT:-gitea}/db:/var/lib/postgresql/data
-    
-    
+
     # ###############################
     # #           Jenkins           #
     # ###############################
@@ -794,204 +793,6 @@ services:
     #         - ${SERVICES_ROOT}/${OMBI_ROOT:-ombi}:/config
     #     restart: unless-stopped
 
-    # ###############################
-    # #           Mastodon          #
-    # ###############################
-    # mastodon-web: 
-    #     image: tootsuite/mastodon
-    #     container_name: mostodon-web
-    #     restart: always
-    #     command: bash -c "rm -f /mastodon/tmp/pids/server.pid; bundle exec rails s -p 3000"
-    #     environment:
-    #         - RAILS_ENV=production
-    #         - SECRET_KEY_BASE=${MASTODON_SECRET_KEY_BASE}
-    #         - OTP_SECRET=${MASTODON_OTP_SECRET}
-    #         - DB_HOST=mastodon-db
-    #         - DB_USER=mastodon
-    #         - DB_NAME=mastodon
-    #         - DB_PASS=${MASTODON_DB_PASSWORD}
-    #         - REDIS_HOST=mastodon-cache
-    #         # - CACHE_REDIS_HOST=mastodon-cache
-    #         # - ES_ENABLED=true
-    #         # - ES_HOST=mastodon-elasticsearch
-    #         - LDAP_ENABLED=true
-    #         - LDAP_HOST=openldap
-    #         - LDAP_BASE=${LDAP_LOGIN_BASE}
-    #         - LDAP_BIND_DN=admin,${LDAP_LOGIN_BASE}
-    #         - LDAP_PASSWORD=${LDAP_ADMIN_PASSWORD}
-    #         - LDAP_UID=uid
-    #         # - LDAP_SEARCH_FILTER
-    #         # - SMTP_SERVER
-    #         # - SMTP_PORT
-    #         # - SMTP_LOGIN
-    #         # - SMTP_PASSWORD
-    #         # - SMTP_FROM_ADDRESS
-    #         # - SMTP_TLS
-    #         # - SMTP_AUTH_METHOD
-    #         # - SMTP_DOMAIN
-    #         # - STATSD_ADDR
-    #         # - STATSD_NAMESPACE
-
-    #     networks:
-    #         - proxy
-    #         - mastodon
-    #     depends_on:
-    #         - mastodon-db
-    #         - mastodon-cache
-    #         # - mastodon-search
-    #     labels:
-    #         - "traefik.enable=true"
-    #         - "traefik.http.routers.mastodon-web.rule=Host(`${MASTODON_DOMAIN:?Domain for Mastodon must be set!}`)"
-    #         - "traefik.http.routers.mastodon-web.entrypoints=secure"
-    #         - "traefik.http.services.mastodon-web.loadbalancer.server.port=3000"
-    #         - "traefik.http.routers.mastodon-web.tls=true"
-    #     volumes:
-    #         - ${SERVICES_ROOT}/${MASTODON_ROOT:-mastodon}/public/system:/mastodon/public/system
-
-    # mastodon-streaming: 
-    #     image: tootsuite/mastodon
-    #     container_name: mastodon-streaming
-    #     restart: always
-    #     command: node ./streaming
-    #     expose:
-    #         - 4000
-    #     environment:
-    #         - LOCAL_DOMAIN=${MASTODON_DOMAIN}
-    #         - SINGLE_USER_MODE=false
-    #         - SECRET_KEY_BASE=${MASTODON_SECRET_KEY_BASE}
-    #         - OTP_SECRET=${MASTODON_OTP_SECRET}
-    #         - DB_HOST=mastodon-db
-    #         - DB_USER=mastodon
-    #         - DB_PORT=5432
-    #         - DB_NAME=mastodon
-    #         - DB_PASS=${MASTODON_DB_PASSWORD}
-    #         - REDIS_HOST=mastodon-cache
-    #         - REDIS_PORT=6379
-    #         # - REDIS_PASSWORD=
-    #         # - CACHE_REDIS_HOST=mastodon-cache
-    #         # - ES_ENABLED=true
-    #         # - ES_HOST=mastodon-search
-    #         - LDAP_ENABLED=true
-    #         - LDAP_HOST=openldap
-    #         - LDAP_BASE=${LDAP_LOGIN_BASE}
-    #         - LDAP_BIND_DN=admin,${LDAP_LOGIN_BASE}
-    #         - LDAP_PASSWORD=${LDAP_ADMIN_PASSWORD}
-    #         - LDAP_UID=uid
-    #         - LDAP_METHOD=simple
-    #         - LDAP_TLS_NO_VERIFY=true
-    #         # - LDAP_SEARCH_FILTER=(|(%{uid}=%{email})(%{mail}=%{email}))
-    #         # - SMTP_SERVER
-    #         # - SMTP_PORT
-    #         # - SMTP_LOGIN
-    #         # - SMTP_PASSWORD
-    #         # - SMTP_FROM_ADDRESS
-    #         # - SMTP_TLS
-    #         # - SMTP_AUTH_METHOD
-    #         # - SMTP_DOMAIN
-    #         # - STATSD_ADDR
-    #         # - STATSD_NAMESPACE
-    #     networks:
-    #         - proxy
-    #         - mastodon
-    #     depends_on:
-    #         - mastodon-db
-    #         - mastodon-cache
-    #     labels:
-    #         - "traefik.enable=true"
-    #         - "traefik.http.routers.mastodon-streaming.rule=(Host(`MASTODON_DOMAIN`) && PathPrefix(`/api/v1/streaming`))"
-    #         - "traefik.http.routers.mastodon-streaming.entrypoints=secure"
-    #         - "traefik.http.services.mastodon-streaming.loadbalancer.server.port=4000"
-    #         - "traefik.http.routers.mastodon-streaming.tls=true"
-
-    # mastodon-sidekiq:
-    #     image: tootsuite/mastodon
-    #     container_name: mastodon-sidekiq
-    #     restart: always
-    #     command: bundle exec sidekiq
-    #     environment:
-    #         - SECRET_KEY_BASE=${MASTODON_SECRET_KEY_BASE}
-    #         - OTP_SECRET=${MASTODON_OTP_SECRET}
-    #         - DB_HOST=mastodon-db
-    #         - DB_USER=mastodon
-    #         - DB_NAME=mastodon
-    #         - DB_PASS=${MASTODON_DB_PASSWORD}
-    #         - REDIS_HOST=mastodon-cache
-    #         # - CACHE_REDIS_HOST=mastodon-cache
-    #         # - ES_ENABLED=true
-    #         # - ES_HOST=mastodon-search
-    #         - LDAP_ENABLED=true
-    #         - LDAP_HOST=openldap
-    #         - LDAP_BASE=${LDAP_LOGIN_BASE}
-    #         - LDAP_BIND_DN=admin,${LDAP_LOGIN_BASE}
-    #         - LDAP_PASSWORD=${LDAP_ADMIN_PASSWORD}
-    #         - LDAP_UID=uid
-    #         # - LDAP_SEARCH_FILTER
-    #         # - SMTP_SERVER
-    #         # - SMTP_PORT
-    #         # - SMTP_LOGIN
-    #         # - SMTP_PASSWORD
-    #         # - SMTP_FROM_ADDRESS
-    #         # - SMTP_TLS
-    #         # - SMTP_AUTH_METHOD
-    #         # - SMTP_DOMAIN
-    #         # - STATSD_ADDR
-    #         # - STATSD_NAMESPACE
-    #     depends_on:
-    #         - mastodon-db
-    #         - mastodon-cache
-    #         - traefik
-    #     networks:
-    #         - proxy
-    #         - mastodon
-    #     volumes:
-    #         - ${SERVICES_ROOT}/${MASTODON_ROOT:-mastodon}/public/system:/mastodon/public/system
-
-    # mastodon-db:
-    #     image: postgres:9.6-alpine
-    #     container_name: mastodon-db
-    #     restart: unless-stopped
-    #     networks:
-    #         - mastodon
-    #     environment:
-    #         - POSTGRES_DB=mastodon
-    #         - POSTGRES_USER=mastodon
-    #         - POSTGRES_PASSWORD=${MASTODON_DB_PASSWORD:?Password for Mastodon db must be set}
-    #         - TZ
-    #     volumes:
-    #         - ${SERVICES_ROOT}/${MASTODON_ROOT:-mastodon}/db:/var/lib/postgresql/data
-
-    # mastodon-cache:
-    #     restart: always
-    #     container_name: mastodon-cache
-    #     image: redis:5.0-alpine
-    #     networks:
-    #         - mastodon
-
-    # mastodon-search:
-    #     restart: always
-    #     image: docker.elastic.co/elasticsearch/elasticsearch-oss:6.1.3
-    #     environment:
-    #         - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-    #     networks:
-    #         - mastodon
-    #     volumes:
-    #         - ${SERVICES_ROOT}/${MASTODON_ROOT:-mastodon}/elasticsearch:/usr/share/elasticsearch/data
-    
-    ## Uncomment to enable federation with tor instances along with adding the following ENV variables
-    ## http_proxy=http://privoxy:8118
-    ## ALLOW_ACCESS_TO_HIDDEN_SERVICE=true
-    # tor:
-    #     image: sirboops/tor
-    #     networks:
-    #         - proxy
-    #         - mastodon
-    # privoxy:
-    #     image: sirboops/privoxy
-    #     volumes:
-    #         - ${SERVICES_ROOT}/${MASTODON_ROOT:-mastodon}/priv-config:/opt/config
-    #     networks:
-    #         - proxy
-    #         - mastodon
     # ###############################
     # #           Friendica         #
     # ###############################
@@ -1193,93 +994,381 @@ services:
     ###############################
     #           Bitwarden         #
     ###############################
+    # bitwarden-server:
+    #     image: bitwarden/nginx:latest
+    #     container_name: bitwarden-server
+    #     restart: always
+    #     environment:
+    #         - LOCAL_UID=${UID:-1000}
+    #         - LOCAL_GID=${GID:-1000}
+    #     depends_on:
+    #         - bitwarden-web
+    #         - bitwarden-admin
+    #         - bitwarden-api
+    #         - bitwarden-identity
+    #     volumes:
+    #         - ./configs/bitwarden/nignx:/etc/bitwarden/nginx
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/nginx:/var/log/nginx
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.bitwarden.rule=Host(`${BITWARDEN_DOMAIN:?Domain for Bitwarden must be set!}`)"
+    #         - "traefik.http.routers.bitwarden.entrypoints=secure"
+    #         - "traefik.http.services.bitwarden.loadbalancer.server.port=8443"
+    #         - "traefik.http.routers.bitwarden.tls=true"
+    #     networks:
+    #         - proxy
+    #         - bitwarden
+
     # bitwarden-db:
     #     image: bitwarden/mssql:latest
     #     container_name: bitwarden-mssql
     #     restart: always
     #     stop_grace_period: 60s
+    #     environment:
+    #         - ACCEPT_EULA=Y
+    #         - MSSQL_PID=Express
+    #         - SA_PASSWORD=${BITWARDEN_DB_PASSWORD:?Bitwarden db needs a password!}
+    #         - LOCAL_UID=${UID:-1000}
+    #         - LOCAL_GID=${GID:-1000}
     #     volumes:
-    #         - ../mssql/data:/var/opt/mssql/data
-    #         - ../logs/mssql:/var/opt/mssql/log
-    #         - ../mssql/backups:/etc/bitwarden/mssql/backups
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/db:/var/opt/mssql
+    #     networks:
+    #         - bitwarden
+
     # bitwarden-web:
     #     image: bitwarden/web:latest
     #     container_name: bitwarden-web
     #     restart: always
+    #     environment:
+    #         - ASPNETCORE_ENVIRONMENT=Production
+    #         - globalSettings__selfHosted=true
+    #         - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+    #         - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+    #         - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+    #         - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+    #         - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+    #         - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+    #         - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+    #         - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+    #         - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+    #         - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+    #         - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+    #         - globalSettings__installation__identityUri=https://identity.bitwarden.com
+    #         - LOCAL_UID=${UID:-1000}
+    #         - LOCAL_GID=${GID:-1000}
     #     volumes:
-    #         - ../web:/etc/bitwarden/web
+    #         - ./configs/bitwarden/web:/etc/bitwarden/web
+    #     networks:
+    #         - proxy
+
     # bitwarden-attachments:
     #     image: bitwarden/attachments:latest
     #     container_name: bitwarden-attachments
     #     restart: always
+    #     environment:
+    #         - ASPNETCORE_ENVIRONMENT=Production
+    #         - globalSettings__selfHosted=true
+    #         - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+    #         - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+    #         - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+    #         - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+    #         - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+    #         - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+    #         - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+    #         - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+    #         - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+    #         - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+    #         - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+    #         - globalSettings__installation__identityUri=https://identity.bitwarden.com
+    #         - LOCAL_UID=${UID:-1000}
+    #         - LOCAL_GID=${GID:-1000}
     #     volumes:
-    #         - ../core/attachments:/etc/bitwarden/core/attachments
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/attachments:/etc/bitwarden/core/attachments
+    #     networks:
+    #         - proxy
+
     # bitwarden-api:
     #     image: bitwarden/api:latest
     #     container_name: bitwarden-api
     #     restart: always
+    #     environment:
+    #         - ASPNETCORE_ENVIRONMENT=Production
+    #         - globalSettings__selfHosted=true
+    #         - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+    #         - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+    #         - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+    #         - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+    #         - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+    #         - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+    #         - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+    #         - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+    #         - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+    #         - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+    #         - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+    #         - globalSettings__installation__identityUri=https://identity.bitwarden.com
+    #         - globalSettings__sqlServer__connectionString="Data Source=tcp:mssql,1433;Initial Catalog=vault;Persist Security Info=False;User ID=sa;Password=${BITWARDEN_DB_PASSWORD};MultipleActiveResultSets=False;Connect Timeout=30;Encrypt=True;TrustServerCertificate=True"
+    #         - globalSettings__identityServer__certificatePassword=${BITWARDEN_IDENTITY_CERT_PASSWORD}
+    #         - globalSettings__attachment__baseDirectory=/etc/bitwarden/core/attachments
+    #         - globalSettings__attachment__baseUrl=https://${BITWARDEN_DOMAIN}/attachments
+    #         - globalSettings__dataProtection__directory=/etc/bitwarden/core/aspnet-dataprotection
+    #         - globalSettings__logDirectory=/etc/bitwarden/logs
+    #         - globalSettings__licenseDirectory=/etc/bitwarden/core/licenses
+    #         - globalSettings__internalIdentityKey=${BITWARDEN_IDENTITY_KEY:?You must enter an identity key for Bitwarden!}
+    #         - globalSettings__duo__aKey=${BITWARDEN_DUO_KEY}
+    #         - globalSettings__installation__id=${BITWARDEN_INSTALLATION_ID:?Bitwarden needs an installation ID!}
+    #         - globalSettings__installation__key=${BITWARDEN_INSTALLATION_KEY:?Bitwarden needs an installation key!}
+    #         - globalSettings__yubico__clientId=${BITWARDEN_YUBICO_CLIENT_ID}
+    #         - globalSettings__yubico__key=${BITWARDEN_YUBICO_KEY}
+    #         - globalSettings__mail__replyToEmail=no-reply@${BITWARDEN_DOMAIN}
+    #         - globalSettings__mail__smtp__host=${BITWARDEN_SMTP_HOST}
+    #         - globalSettings__mail__smtp__port=587
+    #         - globalSettings__mail__smtp__ssl=false
+    #         - globalSettings__mail__smtp__username=${BITWARDEN_SMTP_USERNAME}
+    #         - globalSettings__mail__smtp__password=${BITWARDEN_SMTP_PASSWORD}
+    #         - globalSettings__disableUserRegistration=true
+    #         - LOCAL_UID=${UID:-1000}
+    #         - LOCAL_GID=${GID:-1000}
+    #         # - globalSettings__hibpApiKey=${BITWARDEN_HIBP_APIKEY}
+    #         # - adminSettings__admins=
     #     volumes:
-    #         - ../core:/etc/bitwarden/core
-    #         - ../ca-certificates:/etc/bitwarden/ca-certificates
-    #         - ../logs/api:/etc/bitwarden/logs
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/core:/etc/bitwarden/core
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/ca-certificates:/etc/bitwarden/ca-certificates
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/api:/etc/bitwarden/logs
     #     networks:
-    #         - default
-    #         - public
+    #         - proxy
+
     # bitwarden-identity:
     #     image: bitwarden/identity:latest
     #     container_name: bitwarden-identity
     #     restart: always
     #     volumes:
-    #         - ../identity:/etc/bitwarden/identity
-    #         - ../core:/etc/bitwarden/core
-    #         - ../ca-certificates:/etc/bitwarden/ca-certificates
-    #         - ../logs/identity:/etc/bitwarden/logs
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/identity:/etc/bitwarden/identity
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/core:/etc/bitwarden/core
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/ca-certificates:/etc/bitwarden/ca-certificates
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/identity:/etc/bitwarden/logs
+    #     environment:
+    #         - ASPNETCORE_ENVIRONMENT=Production
+    #         - globalSettings__selfHosted=true
+    #         - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+    #         - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+    #         - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+    #         - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+    #         - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+    #         - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+    #         - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+    #         - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+    #         - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+    #         - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+    #         - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+    #         - globalSettings__installation__identityUri=https://identity.bitwarden.com
+    #         - globalSettings__sqlServer__connectionString="Data Source=tcp:mssql,1433;Initial Catalog=vault;Persist Security Info=False;User ID=sa;Password=${BITWARDEN_DB_PASSWORD};MultipleActiveResultSets=False;Connect Timeout=30;Encrypt=True;TrustServerCertificate=True"
+    #         - globalSettings__identityServer__certificatePassword=${BITWARDEN_IDENTITY_CERT_PASSWORD}
+    #         - globalSettings__attachment__baseDirectory=/etc/bitwarden/core/attachments
+    #         - globalSettings__attachment__baseUrl=https://${BITWARDEN_DOMAIN}/attachments
+    #         - globalSettings__dataProtection__directory=/etc/bitwarden/core/aspnet-dataprotection
+    #         - globalSettings__logDirectory=/etc/bitwarden/logs
+    #         - globalSettings__licenseDirectory=/etc/bitwarden/core/licenses
+    #         - globalSettings__internalIdentityKey=${BITWARDEN_IDENTITY_KEY:?You must enter an identity key for Bitwarden!}
+    #         - globalSettings__duo__aKey=${BITWARDEN_DUO_KEY}
+    #         - globalSettings__installation__id=${BITWARDEN_INSTALLATION_ID}
+    #         - globalSettings__installation__key=${BITWARDEN_INSTALLATION_KEY}
+    #         - globalSettings__yubico__clientId=${BITWARDEN_YUBICO_CLIENT_ID}
+    #         - globalSettings__yubico__key=${BITWARDEN_YUBICO_KEY}
+    #         - globalSettings__mail__replyToEmail=no-reply@${BITWARDEN_DOMAIN}
+    #         - globalSettings__mail__smtp__host=${BITWARDEN_SMTP_HOST}
+    #         - globalSettings__mail__smtp__port=587
+    #         - globalSettings__mail__smtp__ssl=false
+    #         - globalSettings__mail__smtp__username=${BITWARDEN_SMTP_USERNAME}
+    #         - globalSettings__mail__smtp__password=${BITWARDEN_SMTP_PASSWORD}
+    #         - globalSettings__disableUserRegistration=true
+    #         - LOCAL_UID=${UID:-1000}
+    #         - LOCAL_GID=${GID:-1000}
+    #         # - globalSettings__hibpApiKey=${BITWARDEN_HIBP_APIKEY}
+    #         # - adminSettings__admins=
     #     networks:
-    #         - default
-    #         - public
+    #         - proxy
+
     # bitwarden-admin:
     #     image: bitwarden/admin:latest
     #     container_name: bitwarden-admin
     #     restart: always
     #     depends_on:
-    #         - mssql
+    #         - bitwarden-db
     #     volumes:
-    #         - ../core:/etc/bitwarden/core
-    #         - ../ca-certificates:/etc/bitwarden/ca-certificates
-    #         - ../logs/admin:/etc/bitwarden/logs
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/core:/etc/bitwarden/core
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/ca-certificates:/etc/bitwarden/ca-certificates
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/admin:/etc/bitwarden/logs
+    #     environment:
+    #         - ASPNETCORE_ENVIRONMENT=Production
+    #         - globalSettings__selfHosted=true
+    #         - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+    #         - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+    #         - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+    #         - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+    #         - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+    #         - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+    #         - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+    #         - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+    #         - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+    #         - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+    #         - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+    #         - globalSettings__installation__identityUri=https://identity.bitwarden.com
+    #         - globalSettings__sqlServer__connectionString="Data Source=tcp:bitwarden-db,1433;Initial Catalog=vault;Persist Security Info=False;User ID=sa;Password=${BITWARDEN_DB_PASSWORD};MultipleActiveResultSets=False;Connect Timeout=30;Encrypt=True;TrustServerCertificate=True"
+    #         - globalSettings__identityServer__certificatePassword=${BITWARDEN_IDENTITY_CERT_PASSWORD}
+    #         - globalSettings__attachment__baseDirectory=/etc/bitwarden/core/attachments
+    #         - globalSettings__attachment__baseUrl=https://${BITWARDEN_DOMAIN}/attachments
+    #         - globalSettings__dataProtection__directory=/etc/bitwarden/core/aspnet-dataprotection
+    #         - globalSettings__logDirectory=/etc/bitwarden/logs
+    #         - globalSettings__licenseDirectory=/etc/bitwarden/core/licenses
+    #         - globalSettings__internalIdentityKey=${BITWARDEN_IDENTITY_KEY:?You must enter an identity key for Bitwarden!}
+    #         - globalSettings__duo__aKey=${BITWARDEN_DUO_KEY}
+    #         - globalSettings__installation__id=${BITWARDEN_INSTALLATION_ID}
+    #         - globalSettings__installation__key=${BITWARDEN_INSTALLATION_KEY}
+    #         - globalSettings__yubico__clientId=${BITWARDEN_YUBICO_CLIENT_ID}
+    #         - globalSettings__yubico__key=${BITWARDEN_YUBICO_KEY}
+    #         - globalSettings__mail__replyToEmail=no-reply@${BITWARDEN_DOMAIN}
+    #         - globalSettings__mail__smtp__host=${BITWARDEN_SMTP_HOST}
+    #         - globalSettings__mail__smtp__port=587
+    #         - globalSettings__mail__smtp__ssl=false
+    #         - globalSettings__mail__smtp__username=${BITWARDEN_SMTP_USERNAME}
+    #         - globalSettings__mail__smtp__password=${BITWARDEN_SMTP_PASSWORD}
+    #         - globalSettings__disableUserRegistration=true
+    #         - LOCAL_UID=${UID:-1000}
+    #         - LOCAL_GID=${GID:-1000}
+    #         # - globalSettings__hibpApiKey=${BITWARDEN_HIBP_APIKEY}
+    #         # - adminSettings__admins=
     #     networks:
-    #         - default
-    #         - public
+    #         - bitwarden
+    #         - proxy
+
     # bitwarden-icons:
     #     image: bitwarden/icons:latest
     #     container_name: bitwarden-icons
     #     restart: always
     #     volumes:
-    #         - ../ca-certificates:/etc/bitwarden/ca-certificates
-    #         - ../logs/icons:/etc/bitwarden/logs
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/ca-certificates:/etc/bitwarden/ca-certificates
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/icons:/etc/bitwarden/logs
+    #     environment:
+    #         - ASPNETCORE_ENVIRONMENT=Production
+    #         - globalSettings__selfHosted=true
+    #         - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+    #         - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+    #         - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+    #         - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+    #         - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+    #         - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+    #         - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+    #         - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+    #         - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+    #         - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+    #         - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+    #         - globalSettings__installation__identityUri=https://identity.bitwarden.com
+    #         - LOCAL_UID=${UID:-1000}
+    #         - LOCAL_GID=${GID:-1000}
     #     networks:
-    #         - default
-    #         - public
+    #         - bitwarden
+    #         - proxy
+
     # bitwarden-notifications:
     #     image: bitwarden/notifications:latest
     #     container_name: bitwarden-notifications
     #     restart: always
     #     volumes:
-    #         - ../ca-certificates:/etc/bitwarden/ca-certificates
-    #         - ../logs/notifications:/etc/bitwarden/logs
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/ca-certificates:/etc/bitwarden/ca-certificates
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/notifications:/etc/bitwarden/logs
+    #     environment:
+    #         - ASPNETCORE_ENVIRONMENT=Production
+    #         - globalSettings__selfHosted=true
+    #         - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+    #         - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+    #         - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+    #         - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+    #         - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+    #         - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+    #         - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+    #         - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+    #         - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+    #         - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+    #         - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+    #         - globalSettings__installation__identityUri=https://identity.bitwarden.com
+    #         - globalSettings__sqlServer__connectionString="Data Source=tcp:mssql,1433;Initial Catalog=vault;Persist Security Info=False;User ID=sa;Password=${BITWARDEN_DB_PASSWORD};MultipleActiveResultSets=False;Connect Timeout=30;Encrypt=True;TrustServerCertificate=True"
+    #         - globalSettings__identityServer__certificatePassword=${BITWARDEN_IDENTITY_CERT_PASSWORD}
+    #         - globalSettings__attachment__baseDirectory=/etc/bitwarden/core/attachments
+    #         - globalSettings__attachment__baseUrl=https://${BITWARDEN_DOMAIN}/attachments
+    #         - globalSettings__dataProtection__directory=/etc/bitwarden/core/aspnet-dataprotection
+    #         - globalSettings__logDirectory=/etc/bitwarden/logs
+    #         - globalSettings__licenseDirectory=/etc/bitwarden/core/licenses
+    #         - globalSettings__internalIdentityKey=${BITWARDEN_IDENTITY_KEY:?You must enter an identity key for Bitwarden!}
+    #         - globalSettings__duo__aKey=${BITWARDEN_DUO_KEY}
+    #         - globalSettings__installation__id=${BITWARDEN_INSTALLATION_ID}
+    #         - globalSettings__installation__key=${BITWARDEN_INSTALLATION_KEY}
+    #         - globalSettings__yubico__clientId=${BITWARDEN_YUBICO_CLIENT_ID}
+    #         - globalSettings__yubico__key=${BITWARDEN_YUBICO_KEY}
+    #         - globalSettings__mail__replyToEmail=no-reply@${BITWARDEN_DOMAIN}
+    #         - globalSettings__mail__smtp__host=${BITWARDEN_SMTP_HOST}
+    #         - globalSettings__mail__smtp__port=587
+    #         - globalSettings__mail__smtp__ssl=false
+    #         - globalSettings__mail__smtp__username=${BITWARDEN_SMTP_USERNAME}
+    #         - globalSettings__mail__smtp__password=${BITWARDEN_SMTP_PASSWORD}
+    #         - globalSettings__disableUserRegistration=true
+    #         - LOCAL_UID=${UID:-1000}
+    #         - LOCAL_GID=${GID:-1000}
+    #         # - globalSettings__hibpApiKey=${BITWARDEN_HIBP_APIKEY}
+    #         - adminSettings__admins=${BITWARDEN_ADIMNS}
     #     networks:
-    #         - default
-    #         - public
+    #         - bitwarden
+    #         - proxy
+
     # bitwarden-events:
     #     image: bitwarden/events:latest
     #     container_name: bitwarden-events
     #     restart: always
     #     volumes:
-    #         - ../ca-certificates:/etc/bitwarden/ca-certificates
-    #         - ../logs/events:/etc/bitwarden/logs
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/ca-certificates:/etc/bitwarden/ca-certificates
+    #         - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/events:/etc/bitwarden/logs
+    #     environment:
+    #         - ASPNETCORE_ENVIRONMENT=Production
+    #         - globalSettings__selfHosted=true
+    #         - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+    #         - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+    #         - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+    #         - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+    #         - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+    #         - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+    #         - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+    #         - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+    #         - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+    #         - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+    #         - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+    #         - globalSettings__installation__identityUri=https://identity.bitwarden.com
+    #         - globalSettings__sqlServer__connectionString="Data Source=tcp:mssql,1433;Initial Catalog=vault;Persist Security Info=False;User ID=sa;Password=${BITWARDEN_DB_PASSWORD};MultipleActiveResultSets=False;Connect Timeout=30;Encrypt=True;TrustServerCertificate=True"
+    #         - globalSettings__identityServer__certificatePassword=${BITWARDEN_IDENTITY_CERT_PASSWORD}
+    #         - globalSettings__attachment__baseDirectory=/etc/bitwarden/core/attachments
+    #         - globalSettings__attachment__baseUrl=https://${BITWARDEN_DOMAIN}/attachments
+    #         - globalSettings__dataProtection__directory=/etc/bitwarden/core/aspnet-dataprotection
+    #         - globalSettings__logDirectory=/etc/bitwarden/logs
+    #         - globalSettings__licenseDirectory=/etc/bitwarden/core/licenses
+    #         - globalSettings__internalIdentityKey=${BITWARDEN_IDENTITY_KEY:?You must enter an identity key for Bitwarden!}
+    #         - globalSettings__duo__aKey=${BITWARDEN_DUO_KEY}
+    #         - globalSettings__installation__id=${BITWARDEN_INSTALLATION_ID}
+    #         - globalSettings__installation__key=${BITWARDEN_INSTALLATION_KEY}
+    #         - globalSettings__yubico__clientId=${BITWARDEN_YUBICO_CLIENT_ID}
+    #         - globalSettings__yubico__key=${BITWARDEN_YUBICO_KEY}
+    #         - globalSettings__mail__replyToEmail=no-reply@${BITWARDEN_DOMAIN}
+    #         - globalSettings__mail__smtp__host=${BITWARDEN_SMTP_HOST}
+    #         - globalSettings__mail__smtp__port=587
+    #         - globalSettings__mail__smtp__ssl=false
+    #         - globalSettings__mail__smtp__username=${BITWARDEN_SMTP_USERNAME}
+    #         - globalSettings__mail__smtp__password=${BITWARDEN_SMTP_PASSWORD}
+    #         - globalSettings__disableUserRegistration=true
+    #         - LOCAL_UID=${UID:-1000}
+    #         - LOCAL_GID=${GID:-1000}
+    #         # - globalSettings__hibpApiKey=${BITWARDEN_HIBP_APIKEY}
+    #         # - adminSettings__admins=
     #     networks:
-    #         - default
-    #         - public
+    #         - proxy
+    #         - bitwarden
+
     ###############################
     #           Mailcow           #
     ###############################
@@ -1968,7 +2057,7 @@ services:
     ###############################
     #           NordVPN           #
     ###############################
-        # https://github.com/bubuntux/nordvpn
+    # https://github.com/bubuntux/nordvpn
     # vpn:
     #     image: bubuntux/nordvpn
     #     network_mode: bridge
@@ -2007,7 +2096,7 @@ services:
     #         - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/config:/config
     #         - ${DOWNLOADS_ROOT}:/downloads
     #         - ${SERVICES_ROOT}/${TRANSMISSION_ROOT:-transmission}/torrentfiles:/watch
-        
+
     # transmission-exporter:
     #     image: metalmatze/transmission-exporter
     #     container_name: transmission-exporter
@@ -2023,38 +2112,38 @@ services:
     #         Guacamole           #
     ###############################
     # https://guacamole.apache.org/doc/gug/guacamole-docker.html
-    guacamole:
-        image: guacamole/guacamole
-        container_name: guacamole
-        restart: unless-stopped
-        networks:
-            - proxy
-            - guacamole
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.guacamole.rule=Host(`${GUACAMOLE_DOMAIN:?Domain for Guacamole must be set!}`)"
-            - "traefik.http.routers.guacamole.entrypoints=secure"
-            - "traefik.http.services.guacamole.loadbalancer.server.port=8080"
-            - "traefik.http.routers.guacamole.tls=true"
-            - "traefik.http.routers.guacamole.middlewares=guacamole@file"
-        environment:
-            - LDAP_HOSTNAME=openldap
-            - LDAP_PORT
-            - LDAP_ENCRYPTION_METHOD
-            - LDAP_USER_BASE_DN=ou=people,${LDAP_LOGIN_BASE}
-            - LDAP_SEARCH_BIND_DN=cn=admin,${LDAP_LOGIN_BASE}
-            - LDAP_SEARCH_BIND_PASSWORD=${LDAP_ADMIN_PASSWORD}
-            - LDAP_USERNAME_ATTRIBUTE=uid
-            - GUACD_HOSTNAME=guacd
+    # guacamole:
+    #     image: guacamole/guacamole
+    #     container_name: guacamole
+    #     restart: unless-stopped
+    #     networks:
+    #         - proxy
+    #         - guacamole
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.guacamole.rule=Host(`${GUACAMOLE_DOMAIN:?Domain for Guacamole must be set!}`)"
+    #         - "traefik.http.routers.guacamole.entrypoints=secure"
+    #         - "traefik.http.services.guacamole.loadbalancer.server.port=8080"
+    #         - "traefik.http.routers.guacamole.tls=true"
+    #         - "traefik.http.routers.guacamole.middlewares=guacamole@file"
+    #     environment:
+    #         - LDAP_HOSTNAME=openldap
+    #         - LDAP_PORT
+    #         - LDAP_ENCRYPTION_METHOD
+    #         - LDAP_USER_BASE_DN=ou=people,${LDAP_LOGIN_BASE}
+    #         - LDAP_SEARCH_BIND_DN=cn=admin,${LDAP_LOGIN_BASE}
+    #         - LDAP_SEARCH_BIND_PASSWORD=${LDAP_ADMIN_PASSWORD}
+    #         - LDAP_USERNAME_ATTRIBUTE=uid
+    #         - GUACD_HOSTNAME=guacd
 
-    guacd:
-        image: guacamole/guacd
-        container_name: guacd
-        restart: unless-stopped
-        expose:
-            - 4822
-        networks:
-            - guacamole
+    # guacd:
+    #     image: guacamole/guacd
+    #     container_name: guacd
+    #     restart: unless-stopped
+    #     expose:
+    #         - 4822
+    #     networks:
+    #         - guacamole
     ###############################
     #         Cyberchef           #
     ###############################
@@ -2239,7 +2328,6 @@ services:
     #         - "traefik.http.routers.tdarr.middlewares=authelia@file"
     #         - "traefik.http.routers.tdarr.tls=true"
     #     restart: unless-stopped
-
     ###############################
     #         NZBGET             #
     ###############################
@@ -2264,7 +2352,6 @@ services:
     #         - "traefik.http.routers.nzbget.middlewares=authelia@file"
     #         - "traefik.http.routers.nzbget.tls=true"
     #     restart: unless-stopped
-
     ###############################
     #         Syncthing           #
     ###############################
@@ -2295,7 +2382,6 @@ services:
     #         - 22000:22000
     #         - 21027:21027/udp
     #     restart: unless-stopped
-
     ###############################
     #         Bazarr              #
     ###############################
