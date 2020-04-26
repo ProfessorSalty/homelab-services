@@ -1,0 +1,77 @@
+networks:
+  friendica:
+
+services:
+    # ###############################
+    # #           Friendica         #
+    # ###############################
+    friendica:
+        image: friendica:fpm
+        container_name: friendica
+        restart: always
+        volumes:
+            - friendica:/var/www/html
+        expose:
+            - 9000
+        environment:
+            - MYSQL_HOST=friendica-db
+            - MYSQL_USER=friendica
+            - MYSQL_PASSWORD=${FRIENDICA_DB_PASSWORD}
+            - MYSQL_DATABASE=friendica
+            - REDIS_HOST=friendica-cache
+            - FRIENDICA_URL=https://${FRIENDICA_DOMAIN}
+            - FRIENDICA_SITENAME
+            - FRIENDICA_ADMIN_MAIL=friendica@${ROOT_DOMAIN}
+            # - SMTP=${SMTP_SERVER}
+            # - SMTP_DOMAIN
+            # - SMTP_FROM
+            # - SMTP_TLS
+            # - SMTP_STARTTLS
+            # - SMTP_AUTH_USER
+            # - SMTP_AUTH_PASS
+            # - SMTP_AUTH_METHOD
+        networks:
+            - friendica
+
+    friendica-web:
+        image: nginx
+        container_name: friendica-web
+        volumes:
+            - ./configs/friendica/nginx.conf:/etc/nginx/nginx.conf:ro
+            - friendica:/var/www/html:ro
+        restart: always
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.friendica.rule=Host(`${FRIENDICA_DOMAIN:?Domain for Friendica must be set!}`)"
+            - "traefik.http.routers.friendica.entrypoints=secure"
+            - "traefik.http.routers.friendica.tls=true"
+        networks:
+            - proxy
+            - friendica
+
+    friendica-db:
+        image: linuxserver/mariadb
+        container_name: friendica-db
+        restart: always
+        networks:
+            - friendica
+        volumes:
+            - ${SERVICES_ROOT}/${FRIENDICA_ROOT:-friendica}/db:/var/lib/mysql
+        environment:
+            - MYSQL_USER=friendica
+            - MYSQL_PASSWORD=${FRIENDICA_DB_PASSWORD}
+            - MYSQL_DATABASE=friendica
+            - MYSQL_ROOT_PASSWORD=${FRIENDICA_DB_ADMIN_PASSWORD:?Admin password for friendica-db must be set!}
+            - PUID=1000
+            - PGID=1000
+            - TZ
+
+    friendica-cache:
+        image: redis:alpine
+        container_name: friendica-cache
+        environment:
+            - TZ
+        restart: unless-stopped
+        networks:
+            - friendica
+

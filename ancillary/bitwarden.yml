@@ -1,0 +1,381 @@
+networks:
+    bitwarden:
+
+services:
+    ###############################
+    #           Bitwarden         #
+    ###############################
+    bitwarden-server:
+        image: bitwarden/nginx:latest
+        container_name: bitwarden-server
+        restart: always
+        environment:
+            - LOCAL_UID=${UID:-1000}
+            - LOCAL_GID=${GID:-1000}
+        depends_on:
+            - bitwarden-web
+            - bitwarden-admin
+            - bitwarden-api
+            - bitwarden-identity
+        volumes:
+            - ./configs/bitwarden/nignx:/etc/bitwarden/nginx
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/nginx:/var/log/nginx
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.bitwarden.rule=Host(`${BITWARDEN_DOMAIN:?Domain for Bitwarden must be set!}`)"
+            - "traefik.http.routers.bitwarden.entrypoints=secure"
+            - "traefik.http.services.bitwarden.loadbalancer.server.port=8443"
+            - "traefik.http.routers.bitwarden.tls=true"
+        networks:
+            - proxy
+            - bitwarden
+
+    bitwarden-db:
+        image: bitwarden/mssql:latest
+        container_name: bitwarden-mssql
+        restart: always
+        stop_grace_period: 60s
+        environment:
+            - ACCEPT_EULA=Y
+            - MSSQL_PID=Express
+            - SA_PASSWORD=${BITWARDEN_DB_PASSWORD:?Bitwarden db needs a password!}
+            - LOCAL_UID=${UID:-1000}
+            - LOCAL_GID=${GID:-1000}
+        volumes:
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/db:/var/opt/mssql
+        networks:
+            - bitwarden
+
+    bitwarden-web:
+        image: bitwarden/web:latest
+        container_name: bitwarden-web
+        restart: always
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Production
+            - globalSettings__selfHosted=true
+            - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+            - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+            - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+            - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+            - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+            - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+            - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+            - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+            - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+            - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+            - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+            - globalSettings__installation__identityUri=https://identity.bitwarden.com
+            - LOCAL_UID=${UID:-1000}
+            - LOCAL_GID=${GID:-1000}
+        volumes:
+            - ./configs/bitwarden/web:/etc/bitwarden/web
+        networks:
+            - proxy
+
+    bitwarden-attachments:
+        image: bitwarden/attachments:latest
+        container_name: bitwarden-attachments
+        restart: always
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Production
+            - globalSettings__selfHosted=true
+            - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+            - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+            - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+            - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+            - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+            - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+            - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+            - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+            - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+            - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+            - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+            - globalSettings__installation__identityUri=https://identity.bitwarden.com
+            - LOCAL_UID=${UID:-1000}
+            - LOCAL_GID=${GID:-1000}
+        volumes:
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/attachments:/etc/bitwarden/core/attachments
+        networks:
+            - proxy
+
+    bitwarden-api:
+        image: bitwarden/api:latest
+        container_name: bitwarden-api
+        restart: always
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Production
+            - globalSettings__selfHosted=true
+            - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+            - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+            - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+            - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+            - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+            - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+            - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+            - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+            - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+            - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+            - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+            - globalSettings__installation__identityUri=https://identity.bitwarden.com
+            - globalSettings__sqlServer__connectionString="Data Source=tcp:mssql,1433;Initial Catalog=vault;Persist Security Info=False;User ID=sa;Password=${BITWARDEN_DB_PASSWORD};MultipleActiveResultSets=False;Connect Timeout=30;Encrypt=True;TrustServerCertificate=True"
+            - globalSettings__identityServer__certificatePassword=${BITWARDEN_IDENTITY_CERT_PASSWORD}
+            - globalSettings__attachment__baseDirectory=/etc/bitwarden/core/attachments
+            - globalSettings__attachment__baseUrl=https://${BITWARDEN_DOMAIN}/attachments
+            - globalSettings__dataProtection__directory=/etc/bitwarden/core/aspnet-dataprotection
+            - globalSettings__logDirectory=/etc/bitwarden/logs
+            - globalSettings__licenseDirectory=/etc/bitwarden/core/licenses
+            - globalSettings__internalIdentityKey=${BITWARDEN_IDENTITY_KEY:?You must enter an identity key for Bitwarden!}
+            - globalSettings__duo__aKey=${BITWARDEN_DUO_KEY}
+            - globalSettings__installation__id=${BITWARDEN_INSTALLATION_ID:?Bitwarden needs an installation ID!}
+            - globalSettings__installation__key=${BITWARDEN_INSTALLATION_KEY:?Bitwarden needs an installation key!}
+            - globalSettings__yubico__clientId=${BITWARDEN_YUBICO_CLIENT_ID}
+            - globalSettings__yubico__key=${BITWARDEN_YUBICO_KEY}
+            - globalSettings__mail__replyToEmail=no-reply@${BITWARDEN_DOMAIN}
+            - globalSettings__mail__smtp__host=${BITWARDEN_SMTP_HOST}
+            - globalSettings__mail__smtp__port=587
+            - globalSettings__mail__smtp__ssl=false
+            - globalSettings__mail__smtp__username=${BITWARDEN_SMTP_USERNAME}
+            - globalSettings__mail__smtp__password=${BITWARDEN_SMTP_PASSWORD}
+            - globalSettings__disableUserRegistration=true
+            - LOCAL_UID=${UID:-1000}
+            - LOCAL_GID=${GID:-1000}
+            # - globalSettings__hibpApiKey=${BITWARDEN_HIBP_APIKEY}
+            # - adminSettings__admins=
+        volumes:
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/core:/etc/bitwarden/core
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/ca-certificates:/etc/bitwarden/ca-certificates
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/api:/etc/bitwarden/logs
+        networks:
+            - proxy
+
+    bitwarden-identity:
+        image: bitwarden/identity:latest
+        container_name: bitwarden-identity
+        restart: always
+        volumes:
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/identity:/etc/bitwarden/identity
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/core:/etc/bitwarden/core
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/ca-certificates:/etc/bitwarden/ca-certificates
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/identity:/etc/bitwarden/logs
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Production
+            - globalSettings__selfHosted=true
+            - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+            - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+            - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+            - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+            - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+            - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+            - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+            - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+            - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+            - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+            - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+            - globalSettings__installation__identityUri=https://identity.bitwarden.com
+            - globalSettings__sqlServer__connectionString="Data Source=tcp:mssql,1433;Initial Catalog=vault;Persist Security Info=False;User ID=sa;Password=${BITWARDEN_DB_PASSWORD};MultipleActiveResultSets=False;Connect Timeout=30;Encrypt=True;TrustServerCertificate=True"
+            - globalSettings__identityServer__certificatePassword=${BITWARDEN_IDENTITY_CERT_PASSWORD}
+            - globalSettings__attachment__baseDirectory=/etc/bitwarden/core/attachments
+            - globalSettings__attachment__baseUrl=https://${BITWARDEN_DOMAIN}/attachments
+            - globalSettings__dataProtection__directory=/etc/bitwarden/core/aspnet-dataprotection
+            - globalSettings__logDirectory=/etc/bitwarden/logs
+            - globalSettings__licenseDirectory=/etc/bitwarden/core/licenses
+            - globalSettings__internalIdentityKey=${BITWARDEN_IDENTITY_KEY:?You must enter an identity key for Bitwarden!}
+            - globalSettings__duo__aKey=${BITWARDEN_DUO_KEY}
+            - globalSettings__installation__id=${BITWARDEN_INSTALLATION_ID}
+            - globalSettings__installation__key=${BITWARDEN_INSTALLATION_KEY}
+            - globalSettings__yubico__clientId=${BITWARDEN_YUBICO_CLIENT_ID}
+            - globalSettings__yubico__key=${BITWARDEN_YUBICO_KEY}
+            - globalSettings__mail__replyToEmail=no-reply@${BITWARDEN_DOMAIN}
+            - globalSettings__mail__smtp__host=${BITWARDEN_SMTP_HOST}
+            - globalSettings__mail__smtp__port=587
+            - globalSettings__mail__smtp__ssl=false
+            - globalSettings__mail__smtp__username=${BITWARDEN_SMTP_USERNAME}
+            - globalSettings__mail__smtp__password=${BITWARDEN_SMTP_PASSWORD}
+            - globalSettings__disableUserRegistration=true
+            - LOCAL_UID=${UID:-1000}
+            - LOCAL_GID=${GID:-1000}
+            # - globalSettings__hibpApiKey=${BITWARDEN_HIBP_APIKEY}
+            # - adminSettings__admins=
+        networks:
+            - proxy
+
+    bitwarden-admin:
+        image: bitwarden/admin:latest
+        container_name: bitwarden-admin
+        restart: always
+        depends_on:
+            - bitwarden-db
+        volumes:
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/core:/etc/bitwarden/core
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/ca-certificates:/etc/bitwarden/ca-certificates
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/admin:/etc/bitwarden/logs
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Production
+            - globalSettings__selfHosted=true
+            - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+            - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+            - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+            - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+            - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+            - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+            - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+            - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+            - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+            - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+            - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+            - globalSettings__installation__identityUri=https://identity.bitwarden.com
+            - globalSettings__sqlServer__connectionString="Data Source=tcp:bitwarden-db,1433;Initial Catalog=vault;Persist Security Info=False;User ID=sa;Password=${BITWARDEN_DB_PASSWORD};MultipleActiveResultSets=False;Connect Timeout=30;Encrypt=True;TrustServerCertificate=True"
+            - globalSettings__identityServer__certificatePassword=${BITWARDEN_IDENTITY_CERT_PASSWORD}
+            - globalSettings__attachment__baseDirectory=/etc/bitwarden/core/attachments
+            - globalSettings__attachment__baseUrl=https://${BITWARDEN_DOMAIN}/attachments
+            - globalSettings__dataProtection__directory=/etc/bitwarden/core/aspnet-dataprotection
+            - globalSettings__logDirectory=/etc/bitwarden/logs
+            - globalSettings__licenseDirectory=/etc/bitwarden/core/licenses
+            - globalSettings__internalIdentityKey=${BITWARDEN_IDENTITY_KEY:?You must enter an identity key for Bitwarden!}
+            - globalSettings__duo__aKey=${BITWARDEN_DUO_KEY}
+            - globalSettings__installation__id=${BITWARDEN_INSTALLATION_ID}
+            - globalSettings__installation__key=${BITWARDEN_INSTALLATION_KEY}
+            - globalSettings__yubico__clientId=${BITWARDEN_YUBICO_CLIENT_ID}
+            - globalSettings__yubico__key=${BITWARDEN_YUBICO_KEY}
+            - globalSettings__mail__replyToEmail=no-reply@${BITWARDEN_DOMAIN}
+            - globalSettings__mail__smtp__host=${BITWARDEN_SMTP_HOST}
+            - globalSettings__mail__smtp__port=587
+            - globalSettings__mail__smtp__ssl=false
+            - globalSettings__mail__smtp__username=${BITWARDEN_SMTP_USERNAME}
+            - globalSettings__mail__smtp__password=${BITWARDEN_SMTP_PASSWORD}
+            - globalSettings__disableUserRegistration=true
+            - LOCAL_UID=${UID:-1000}
+            - LOCAL_GID=${GID:-1000}
+            # - globalSettings__hibpApiKey=${BITWARDEN_HIBP_APIKEY}
+            # - adminSettings__admins=
+        networks:
+            - bitwarden
+            - proxy
+
+    bitwarden-icons:
+        image: bitwarden/icons:latest
+        container_name: bitwarden-icons
+        restart: always
+        volumes:
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/ca-certificates:/etc/bitwarden/ca-certificates
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/icons:/etc/bitwarden/logs
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Production
+            - globalSettings__selfHosted=true
+            - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+            - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+            - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+            - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+            - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+            - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+            - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+            - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+            - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+            - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+            - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+            - globalSettings__installation__identityUri=https://identity.bitwarden.com
+            - LOCAL_UID=${UID:-1000}
+            - LOCAL_GID=${GID:-1000}
+        networks:
+            - bitwarden
+            - proxy
+
+    bitwarden-notifications:
+        image: bitwarden/notifications:latest
+        container_name: bitwarden-notifications
+        restart: always
+        volumes:
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/ca-certificates:/etc/bitwarden/ca-certificates
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/notifications:/etc/bitwarden/logs
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Production
+            - globalSettings__selfHosted=true
+            - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+            - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+            - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+            - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+            - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+            - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+            - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+            - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+            - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+            - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+            - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+            - globalSettings__installation__identityUri=https://identity.bitwarden.com
+            - globalSettings__sqlServer__connectionString="Data Source=tcp:mssql,1433;Initial Catalog=vault;Persist Security Info=False;User ID=sa;Password=${BITWARDEN_DB_PASSWORD};MultipleActiveResultSets=False;Connect Timeout=30;Encrypt=True;TrustServerCertificate=True"
+            - globalSettings__identityServer__certificatePassword=${BITWARDEN_IDENTITY_CERT_PASSWORD}
+            - globalSettings__attachment__baseDirectory=/etc/bitwarden/core/attachments
+            - globalSettings__attachment__baseUrl=https://${BITWARDEN_DOMAIN}/attachments
+            - globalSettings__dataProtection__directory=/etc/bitwarden/core/aspnet-dataprotection
+            - globalSettings__logDirectory=/etc/bitwarden/logs
+            - globalSettings__licenseDirectory=/etc/bitwarden/core/licenses
+            - globalSettings__internalIdentityKey=${BITWARDEN_IDENTITY_KEY:?You must enter an identity key for Bitwarden!}
+            - globalSettings__duo__aKey=${BITWARDEN_DUO_KEY}
+            - globalSettings__installation__id=${BITWARDEN_INSTALLATION_ID}
+            - globalSettings__installation__key=${BITWARDEN_INSTALLATION_KEY}
+            - globalSettings__yubico__clientId=${BITWARDEN_YUBICO_CLIENT_ID}
+            - globalSettings__yubico__key=${BITWARDEN_YUBICO_KEY}
+            - globalSettings__mail__replyToEmail=no-reply@${BITWARDEN_DOMAIN}
+            - globalSettings__mail__smtp__host=${BITWARDEN_SMTP_HOST}
+            - globalSettings__mail__smtp__port=587
+            - globalSettings__mail__smtp__ssl=false
+            - globalSettings__mail__smtp__username=${BITWARDEN_SMTP_USERNAME}
+            - globalSettings__mail__smtp__password=${BITWARDEN_SMTP_PASSWORD}
+            - globalSettings__disableUserRegistration=true
+            - LOCAL_UID=${UID:-1000}
+            - LOCAL_GID=${GID:-1000}
+            # - globalSettings__hibpApiKey=${BITWARDEN_HIBP_APIKEY}
+            - adminSettings__admins=${BITWARDEN_ADIMNS}
+        networks:
+            - bitwarden
+            - proxy
+
+    bitwarden-events:
+        image: bitwarden/events:latest
+        container_name: bitwarden-events
+        restart: always
+        volumes:
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/ca-certificates:/etc/bitwarden/ca-certificates
+            - ${SERVICES_ROOT}/${BITWARDEN_ROOT:-bitwarden}/logs/events:/etc/bitwarden/logs
+        environment:
+            - ASPNETCORE_ENVIRONMENT=Production
+            - globalSettings__selfHosted=true
+            - globalSettings__baseServiceUri__vault=http://${BITWARDEN_DOMAIN}
+            - globalSettings__baseServiceUri__api=http://${BITWARDEN_DOMAIN}/api
+            - globalSettings__baseServiceUri__identity=http://${BITWARDEN_DOMAIN}/identity
+            - globalSettings__baseServiceUri__admin=http://${BITWARDEN_DOMAIN}/admin
+            - globalSettings__baseServiceUri__notifications=http://${BITWARDEN_DOMAIN}/notifications
+            - globalSettings__baseServiceUri__internalNotifications=http://bitwarden-notifications:5000
+            - globalSettings__baseServiceUri__internalAdmin=http://bitwarden-admin:5000
+            - globalSettings__baseServiceUri__internalIdentity=http://bitwarden-identity:5000
+            - globalSettings__baseServiceUri__internalApi=http://bitwarden-api:5000
+            - globalSettings__baseServiceUri__internalVault=http://bitwarden-web:5000
+            - globalSettings__pushRelayBaseUri=https://push.bitwarden.com
+            - globalSettings__installation__identityUri=https://identity.bitwarden.com
+            - globalSettings__sqlServer__connectionString="Data Source=tcp:mssql,1433;Initial Catalog=vault;Persist Security Info=False;User ID=sa;Password=${BITWARDEN_DB_PASSWORD};MultipleActiveResultSets=False;Connect Timeout=30;Encrypt=True;TrustServerCertificate=True"
+            - globalSettings__identityServer__certificatePassword=${BITWARDEN_IDENTITY_CERT_PASSWORD}
+            - globalSettings__attachment__baseDirectory=/etc/bitwarden/core/attachments
+            - globalSettings__attachment__baseUrl=https://${BITWARDEN_DOMAIN}/attachments
+            - globalSettings__dataProtection__directory=/etc/bitwarden/core/aspnet-dataprotection
+            - globalSettings__logDirectory=/etc/bitwarden/logs
+            - globalSettings__licenseDirectory=/etc/bitwarden/core/licenses
+            - globalSettings__internalIdentityKey=${BITWARDEN_IDENTITY_KEY:?You must enter an identity key for Bitwarden!}
+            - globalSettings__duo__aKey=${BITWARDEN_DUO_KEY}
+            - globalSettings__installation__id=${BITWARDEN_INSTALLATION_ID}
+            - globalSettings__installation__key=${BITWARDEN_INSTALLATION_KEY}
+            - globalSettings__yubico__clientId=${BITWARDEN_YUBICO_CLIENT_ID}
+            - globalSettings__yubico__key=${BITWARDEN_YUBICO_KEY}
+            - globalSettings__mail__replyToEmail=no-reply@${BITWARDEN_DOMAIN}
+            - globalSettings__mail__smtp__host=${BITWARDEN_SMTP_HOST}
+            - globalSettings__mail__smtp__port=587
+            - globalSettings__mail__smtp__ssl=false
+            - globalSettings__mail__smtp__username=${BITWARDEN_SMTP_USERNAME}
+            - globalSettings__mail__smtp__password=${BITWARDEN_SMTP_PASSWORD}
+            - globalSettings__disableUserRegistration=true
+            - LOCAL_UID=${UID:-1000}
+            - LOCAL_GID=${GID:-1000}
+            # - globalSettings__hibpApiKey=${BITWARDEN_HIBP_APIKEY}
+            # - adminSettings__admins=
+        networks:
+            - proxy
+            - bitwarden
