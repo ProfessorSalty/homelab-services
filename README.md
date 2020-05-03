@@ -2,6 +2,8 @@
 * Copy configuration.template.yml
 * Change everything surrounded by curly braces, eg {{example.com}}
 
+`openssl rand -base64 45`
+
 ### Useful links
 * [Encryption key generator](https://www.allkeysgenerator.com/Random/Security-Encryption-Key-Generator.aspx) for quick testing
 

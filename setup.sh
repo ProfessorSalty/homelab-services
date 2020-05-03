@@ -1,4 +1,6 @@
 #!/usr/bin/env sh
+
+# At this time, this script is only for bitwarden
 set -a
 . ./.env
 set +a

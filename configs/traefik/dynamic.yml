@@ -3,7 +3,7 @@ http:
     traefik:
       entryPoints: 
         - secure
-      rule: Host(`{{ env "DASHBOARD_DOMAIN" }}`)
+      rule: Host(`dashboard.{{ env "ROOT_DOMAIN" }}`)
       service: api@internal
       tls:
         certresolver: "le"
@@ -12,24 +12,10 @@ http:
             sans:
               - {{ $sans := env "ROOT_DOMAIN"}}"*.{{ $sans }}"
 
-    # transmission:
-    #   entryPoints:
-    #     - secure
-    #   service: transmission@file
-    #   rule: Host(`{{ env "TRANSMISSION_DOMAIN" }}`)
-    #   tls: {}
-
-  # https://github.com/docker/for-linux/issues/264
-  #   transmission:
-  #     loadBalancer:
-  #       servers:
-  #         - url: http://host.docker.internal:9091
-
-
   middlewares:
     authelia:
       forwardAuth: 
-        address: http://authelia:9091/api/verify?rd=https://{{ env "AUTHELIA_DOMAIN" }}
+        address: http://authelia:9091/api/verify?rd=https://logins.{{ env "ROOT_DOMAIN" }}
       trustForwardHeader: true
     guacamole:
       addPrefix:

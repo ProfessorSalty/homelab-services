@@ -16,6 +16,11 @@ entryPoints:
   secure:
     address: ":443"
 
+metrics:
+  prometheus:
+    addEntryPointsLabels: true
+    addServicesLabels: true
+
 providers:
     file:
       filename: ./dynamic.yml
