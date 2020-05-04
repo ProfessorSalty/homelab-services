@@ -12,3 +12,6 @@ docker run --rm -v "${PWD}/identity:/export" frapsoft/openssl pkcs12 -export -ou
 
 mv identity.pfx $SERVICES_ROOT/${BITWARDEN_ROOT:-bitwarden}/identity
 rm -rf identity
+
+# Install logging driver for Loki
+docker plugin install  grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
