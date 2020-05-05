@@ -449,21 +449,6 @@ services:
             - "traefik.http.routers.phpldapadmin.tls=true"
 
     ###############################
-    #           Fluentd           #
-    ###############################
-    # fluentd:
-    #     build: ./configs/fluentd/build
-    #     container_name: fluentd
-    #     restart: unless-stopped
-    #     ports:
-    #         - "24224:24224"
-    #         - "24224:24224/udp"
-    #     volumes:
-    #         - ./configs/fluentd/config:/fluentd/etc
-    #         - ${SERVICES_ROOT}/${FLUENTD_ROOT:-fluentd}/log:/fluentd/log
-
-    
-    ###############################
     #           loki           #
     ###############################
     loki:
