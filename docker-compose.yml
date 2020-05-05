@@ -183,7 +183,7 @@ services:
             - grafana
         environment:
             - LDAP_LOGIN_BASE
-            - LDAP_ADMIN_PASSWORD
+            - LDAP_READONLY_PASSWORD
             - GF_ANALYTICS_REPORTING_ENABLED=false
             - GF_SECURITY_ADMIN_USER=admin
             - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}

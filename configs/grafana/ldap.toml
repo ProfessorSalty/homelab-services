@@ -4,8 +4,8 @@ port = 389
 use_ssl = false
 start_tls = false
 ssl_skip_verify = false
-bind_dn = "cn=admin,${LDAP_LOGIN_BASE}"
-bind_password = '${LDAP_ADMIN_PASSWORD}'
+bind_dn = "cn=readonly,${LDAP_LOGIN_BASE}"
+bind_password = '${LDAP_READONLY_USER_PASSWOR}'
 search_filter = "(uid=%s)"
 search_base_dns = ["${LDAP_LOGIN_BASE}"]
 
