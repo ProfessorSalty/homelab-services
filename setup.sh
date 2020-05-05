@@ -15,3 +15,5 @@ rm -rf identity
 
 # Install logging driver for Loki
 docker plugin install  grafana/loki-docker-driver:latest --alias loki --grant-all-permissions
+
+mkdir -p ./configs/{openldap,grafana,authelia}/secrets

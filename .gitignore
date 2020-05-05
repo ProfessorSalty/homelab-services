@@ -5,3 +5,5 @@ env.yaml
 98-addgroups.ldif
 97-addusers.ldif
 providers.env
+docker-compose.override.yml
+**/secrets/*
