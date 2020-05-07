@@ -11,3 +11,6 @@
 * Gotify (waiting on LDAP implementation: [see issue](https://github.com/gotify/server/issues/203))
 * Grocy (waiting on LDAP:  [see issue](https://github.com/grocy/grocy/issues/207))
 * An RSS reader with multi user and LDAP support
+
+### Attribution
+<div>Icons made by <a href="https://www.flaticon.com/authors/freepik" title="Freepik">Freepik</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a></div>
