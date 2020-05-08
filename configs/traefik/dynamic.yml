@@ -20,3 +20,8 @@ http:
     guacamole:
       addPrefix:
         prefix: /guacamole
+    allowFrames:
+      headers:
+          contentSecurityPolicy: frame-ancestors 'self' *.{{ env "ROOT_DOMAIN" }}
+          stsIncludeSubdomains: true
+          frameDeny: false

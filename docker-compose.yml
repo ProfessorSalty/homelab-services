@@ -205,6 +205,7 @@ services:
             - "traefik.enable=true"
             - "traefik.http.routers.grafana.rule=Host(`graphs.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.grafana.entrypoints=secure"
+            - "traefik.http.routers.grafana.middlewares=allowFrames@file"
             - "traefik.http.services.grafana.loadbalancer.server.port=3000"
             - "traefik.http.routers.grafana.tls=true"
 
@@ -469,6 +470,7 @@ services:
             - "traefik.enable=true"
             - "traefik.http.routers.phpldapadmin.rule=Host(`admin.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.phpldapadmin.entrypoints=secure"
+            - "traefik.http.routers.phpldapadmin.middlewares=allowFrames@file"
             - "traefik.http.routers.phpldapadmin.tls=true"
 
     ###############################
@@ -517,7 +519,7 @@ services:
             - "traefik.http.middlewares.nextcloud-caldav.redirectregex.permanent=true"
             - "traefik.http.middlewares.nextcloud-caldav.redirectregex.regex=^https://(.*)/.well-known/(card|cal)dav"
             - "traefik.http.middlewares.nextcloud-caldav.redirectregex.replacement=https://$${1}/remote.php/dav/"
-            - "traefik.http.routers.nextcloud.middlewares=nextcloud-caldav@docker"
+            - "traefik.http.routers.nextcloud.middlewares=nextcloud-caldav@docker,allowFrames@file"
             - "traefik.http.routers.nextcloud.entrypoints=secure"
             - "traefik.http.routers.nextcloud.rule=Host(`cloud.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.nextcloud.tls=true"
@@ -748,6 +750,7 @@ services:
             - "traefik.http.routers.portus.rule=Host(`registry.${ROOT_DOMAIN}`)"
             - "traefik.http.services.portus.loadbalancer.server.port=3000"
             - "traefik.http.routers.portus.entrypoints=secure"
+            - "traefik.http.routers.portus.middlewares=allowFrames@file"
             - "traefik.http.routers.portus.tls=true"
     portus-db:
         image: linuxserver/mariadb
@@ -790,7 +793,7 @@ services:
             - DB_USER=bookstack
             - DB_PASS=${BOOKSTACK_DB_PASSWORD}
             - DB_DATABASE=bookstackapp
-            - AUTH_METHOD=standard
+            - AUTH_METHOD=ldap
             - LDAP_SERVER=openldap
             - LDAP_BASE_DN=ou=people,${LDAP_LOGIN_BASE}
             - LDAP_DN=cn=admin,${LDAP_LOGIN_BASE}
@@ -1284,7 +1287,7 @@ services:
             - "traefik.http.routers.sabnzbd.rule=Host(`newsreader.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.sabnzbd.entrypoints=secure"
             - "traefik.http.services.sabnzbd.loadbalancer.server.port=8080"
-            - "traefik.http.routers.sabnzbd.middlewares=authelia@file"
+            - "traefik.http.routers.sabnzbd.middlewares=authelia@file,allowFrames@file"
             - "traefik.http.routers.sabnzbd.tls=true"
         restart: unless-stopped
 
@@ -1317,7 +1320,7 @@ services:
             - "traefik.http.routers.syncthing.rule=Host(`sync.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.syncthing.entrypoints=secure"
             - "traefik.http.services.syncthing.loadbalancer.server.port=8384"
-            - "traefik.http.routers.syncthing.middlewares=authelia@file"
+            - "traefik.http.routers.syncthing.middlewares=authelia@file,allowFrames@file"
             - "traefik.http.routers.syncthing.tls=true"
         ports:
             - 22000:22000
