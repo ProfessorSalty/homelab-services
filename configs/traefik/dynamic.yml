@@ -5,6 +5,8 @@ http:
         - secure
       rule: Host(`dashboard.{{ env "ROOT_DOMAIN" }}`)
       service: api@internal
+      middlewares:
+        - allowFrames
       tls:
         certresolver: "le"
         domains:

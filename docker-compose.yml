@@ -6,6 +6,7 @@ networks:
     nextcloud:
     authelia:
     bookstack:
+    guacamole:
     wekan:
     exporters:
     portus:
@@ -1044,6 +1045,14 @@ services:
             - ${SERVICES_ROOT}/${DUPLCATI_ROOT:-duplicati}/config:/config
             - ${SERVICES_ROOT}/${DUPLCATI_ROOT:-duplicati}/backups:/backups
             - ${SERVICES_ROOT}/${DUPLCATI_ROOT:-duplicati}/source:/source
+        networks:
+            - proxy
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.duplicati.rule=Host(`backup.${ROOT_DOMAIN}`)"
+            - "traefik.http.routers.duplicati.entrypoints=secure"
+            - "traefik.http.routers.duplicati.middlewares=authelia@file"
+            - "traefik.http.routers.duplicati.tls=true"
         restart: unless-stopped
 
     ###############################
@@ -1060,6 +1069,7 @@ services:
         restart: unless-stopped
         networks:
             - proxy
+            - guacamole
         labels:
             - "traefik.enable=true"
             - "traefik.http.routers.guacamole.rule=Host(`desktop.${ROOT_DOMAIN}`)"
@@ -1075,6 +1085,10 @@ services:
             - LDAP_SEARCH_BIND_DN=cn=admin,${LDAP_LOGIN_BASE}
             - LDAP_SEARCH_BIND_PASSWORD=${LDAP_ADMIN_PASSWORD}
             - LDAP_USERNAME_ATTRIBUTE=uid
+            - POSTGRES_DATABASE=guacamole
+            - POSTGRES_HOSTNAME=guacamole-db
+            - POSTGRES_USER=guacamole
+            - POSTGRES_PASSWORD=${GUACAMOLE_DB_PASSWORD:?Guacamole db must have a password!}
             - GUACD_HOSTNAME=guacd
 
     guacd:
@@ -1088,7 +1102,25 @@ services:
         expose:
             - 4822
         networks:
-            - proxy
+            - guacamole
+
+    guacamole-db:
+        image: postgres:12-alpine
+        container_name: guacamole-db
+        logging:
+            driver: "loki"
+            options:
+                loki-url: "http://localhost:3100/loki/api/v1/push"
+        restart: unless-stopped
+        networks:
+            - guacamole
+        environment:
+            - POSTGRES_DB=guacamole
+            - POSTGRES_USER=guacamole
+            - POSTGRES_PASSWORD=${GUACAMOLE_DB_PASSWORD}
+            - TZ
+        volumes:
+            - ${SERVICES_ROOT}/${GUACAMOLE_ROOT:-guacamole}/db:/var/lib/postgresql/data
 
     ###############################
     #         Cyberchef           #
@@ -1136,7 +1168,7 @@ services:
             - "traefik.http.routers.radarr.rule=Host(`radarr.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.radarr.entrypoints=secure"
             - "traefik.http.services.radarr.loadbalancer.server.port=7878"
-            - "traefik.http.routers.radarr.middlewares=authelia@file"
+            - "traefik.http.routers.radarr.middlewares=authelia@file,allowFrames@file"
             - "traefik.http.routers.radarr.tls=true"
         restart: unless-stopped
 
@@ -1166,7 +1198,7 @@ services:
             - "traefik.http.routers.lidarr.rule=Host(`lidarr.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.lidarr.entrypoints=secure"
             - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
-            - "traefik.http.routers.lidarr.middlewares=authelia@file"
+            - "traefik.http.routers.lidarr.middlewares=authelia@file,allowFrames@file"
             - "traefik.http.routers.lidarr.tls=true"
         restart: unless-stopped
 
@@ -1196,39 +1228,8 @@ services:
             - "traefik.http.routers.sonarr.rule=Host(`sonarr.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.sonarr.entrypoints=secure"
             - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
-            - "traefik.http.routers.sonarr.middlewares=authelia@file"
+            - "traefik.http.routers.sonarr.middlewares=authelia@file,allowFrames@file"
             - "traefik.http.routers.sonarr.tls=true"
-        restart: unless-stopped
-
-    ###############################
-    #         Beets               #
-    ###############################
-    beets:
-        image: linuxserver/beets
-        container_name: beets
-        logging:
-            driver: "loki"
-            options:
-                loki-url: "http://localhost:3100/loki/api/v1/push"
-        environment:
-            - PUID=1000
-            - PGID=1000
-            - TZ
-        volumes:
-            - ${SERVICES_ROOT}/${BEETS_ROOT:-beets}/config:/config
-            - ${MUSIC_ROOT}:/music
-            - ${DOWNLOADS_ROOT}:/downloads
-        networks:
-            - proxy
-        ports:
-            - 8337:8337
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.beets.rule=Host(`beets.${ROOT_DOMAIN}`)"
-            - "traefik.http.routers.beets.entrypoints=secure"
-            - "traefik.http.services.beets.loadbalancer.server.port=8337"
-            - "traefik.http.routers.beets.middlewares=authelia@file"
-            - "traefik.http.routers.beets.tls=true"
         restart: unless-stopped
 
     ###############################
@@ -1391,35 +1392,6 @@ services:
             - 9708
 
     ##############################
-    #        Booksonic           #
-    ##############################
-    booksonic:
-        image: linuxserver/booksonic
-        container_name: booksonic
-        environment:
-            - PUID=1000
-            - PGID=1000
-            - TZ
-            - CONTEXT_PATH=audiobooks.${ROOT_DOMAIN}
-        logging:
-            driver: "loki"
-            options:
-                loki-url: "http://localhost:3100/loki/api/v1/push"
-        volumes:
-            - ${SERVICES_ROOT}/${BOOKSONIC_ROOT:-booksonic}/config:/config
-            - ${AUDIOBOOKS_ROOT}:/audiobooks
-            - ${PODCASTS_ROOT}:/podcasts
-        restart: unless-stopped
-        networks:
-            - proxy
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.booksonic.rule=Host(`audiobooks.${ROOT_DOMAIN}`)"
-            - "traefik.http.routers.booksonic.entrypoints=secure"
-            - "traefik.http.services.booksonic.loadbalancer.server.port=4040"
-            - "traefik.http.routers.booksonic.tls=true"
-
-    ##############################
     #        Monitorr            #
     ##############################
     monitorr:
@@ -1528,6 +1500,8 @@ services:
         environment:
             - PUID=1000
             - PGID=1000
+        networks:
+            - proxy
         volumes:
             - ${SERVICES_ROOT}/${RUTORRENT_ROOT:-rutorrent}/config:/config
             - ${DOWNLOADS_ROOT}:/downloads
@@ -1541,4 +1515,27 @@ services:
             - 5000:5000
             - 51413:51413
             - 6881:6881/udp
+        restart: unless-stopped
+        
+    ###############################
+    #         nzbhydra            #
+    ###############################
+    nzbhydra:
+        image: linuxserver/nzbhydra2
+        container_name: nzbhydra
+        environment:
+            - PUID=1000
+            - PGID=1000
+        networks:
+            - proxy
+        volumes:
+            - ${SERVICES_ROOT}/${NZBHYDRA_ROOT:-nzbhydra}/config:/config
+            - ${DOWNLOADS_ROOT}:/downloads
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.nzbhydra.rule=Host(`nzbhydra.${ROOT_DOMAIN}`)"
+            - "traefik.http.routers.nzbhydra.entrypoints=secure"
+            - "traefik.http.services.nzbhydra.loadbalancer.server.port=5076"
+            - "traefik.http.routers.nzbhydra.middlewares=authelia@file"
+            - "traefik.http.routers.nzbhydra.tls=true"
         restart: unless-stopped
