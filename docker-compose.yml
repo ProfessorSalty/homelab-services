@@ -1539,3 +1539,28 @@ services:
             - "traefik.http.routers.nzbhydra.middlewares=authelia@file"
             - "traefik.http.routers.nzbhydra.tls=true"
         restart: unless-stopped
+
+    ###############################
+    #         Mylar               #
+    ###############################
+    mylar:
+        image: hotio/mylar3
+        container_name: mylar
+        environment:
+            - PUID=1000
+            - PGID=1000
+            - UMASK=022
+            - TZ
+        networks:
+            - proxy
+        volumes:
+            - ${SERVICES_ROOT}/${MYLAR_ROOT:-mylar}/config:/config
+            - ${DOWNLOADS_ROOT}:/downloads
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.mylar.rule=Host(`mylar.${ROOT_DOMAIN}`)"
+            - "traefik.http.routers.mylar.entrypoints=secure"
+            - "traefik.http.services.mylar.loadbalancer.server.port=8090"
+            - "traefik.http.routers.mylar.middlewares=authelia@file"
+            - "traefik.http.routers.mylar.tls=true"
+        restart: unless-stopped
