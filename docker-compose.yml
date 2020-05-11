@@ -1044,7 +1044,7 @@ services:
         volumes:
             - ${SERVICES_ROOT}/${DUPLCATI_ROOT:-duplicati}/config:/config
             - ${SERVICES_ROOT}/${DUPLCATI_ROOT:-duplicati}/backups:/backups
-            - ${SERVICES_ROOT}/${DUPLCATI_ROOT:-duplicati}/source:/source
+            - ${SERVICES_ROOT}:/source
         networks:
             - proxy
         labels:
@@ -1357,39 +1357,39 @@ services:
             - "traefik.http.routers.bazarr.tls=true"
         restart: unless-stopped
 
-    ##############################
-    #        Exportarr           #
-    ##############################
-    sonarr-exporter:
-        image: onedr0p/exportarr:master
-        container_name: sonarr-exporter
-        restart: unless-stopped
-        command: ["exportarr", "sonarr"]
-        networks:
-            - exporters
-        environment:
-            PORT: 9707
-            URL: "http://sonarr:8989"
-            APIKEY: ${SONARR_API_KEY}
-            ENABLE_EPISODE_QUALITY_METRICS: "false"
-            DISABLE_SSL_VERIFY: "true"
-        expose:
-            - 9707
+    # ##############################
+    # #        Exportarr           #
+    # ##############################
+    # sonarr-exporter:
+    #     image: onedr0p/exportarr:master
+    #     container_name: sonarr-exporter
+    #     restart: unless-stopped
+    #     command: ["exportarr", "sonarr"]
+    #     networks:
+    #         - exporters
+    #     environment:
+    #         PORT: 9707
+    #         URL: "http://sonarr:8989"
+    #         APIKEY: ${SONARR_API_KEY}
+    #         ENABLE_EPISODE_QUALITY_METRICS: "false"
+    #         DISABLE_SSL_VERIFY: "true"
+    #     expose:
+    #         - 9707
 
-    radarr-exporter:
-        image: onedr0p/exportarr:master
-        container_name: radarr-exporter
-        restart: unless-stopped
-        command: ["exportarr", "radarr"]
-        networks:
-            - exporters
-        environment:
-            PORT: 9708
-            URL: "http://radarr:7878"
-            APIKEY: ${RADARR_API_KEY}
-            DISABLE_SSL_VERIFY: "true"
-        expose:
-            - 9708
+    # radarr-exporter:
+    #     image: onedr0p/exportarr:master
+    #     container_name: radarr-exporter
+    #     restart: unless-stopped
+    #     command: ["exportarr", "radarr"]
+    #     networks:
+    #         - exporters
+    #     environment:
+    #         PORT: 9708
+    #         URL: "http://radarr:7878"
+    #         APIKEY: ${RADARR_API_KEY}
+    #         DISABLE_SSL_VERIFY: "true"
+    #     expose:
+    #         - 9708
 
     ##############################
     #        Monitorr            #

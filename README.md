@@ -17,6 +17,10 @@
 * Run a fresh import on your collection (if you make any changes to the file structure)
 `docker exec -it beets /bin/bash -c 'beet import /music'`
 
+#### Calibre
+* LDAP entries are case sensitive!!
+
+
 ### Useful links
 * [Encryption key generator](https://www.allkeysgenerator.com/Random/Security-Encryption-Key-Generator.aspx) for quick testing
 * [Prepare media for Radarr](https://github.com/Radarr/Radarr/wiki/Create-a-Folder-for-Each-Movie)
