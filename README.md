@@ -24,6 +24,7 @@
 ### Useful links
 * [Encryption key generator](https://www.allkeysgenerator.com/Random/Security-Encryption-Key-Generator.aspx) for quick testing
 * [Prepare media for Radarr](https://github.com/Radarr/Radarr/wiki/Create-a-Folder-for-Each-Movie)
+* [Move files out of folders to be processed](https://unix.stackexchange.com/a/182442)
 
 ### Nice-to-haves
 * Gotify (waiting on LDAP implementation: [see issue](https://github.com/gotify/server/issues/203))

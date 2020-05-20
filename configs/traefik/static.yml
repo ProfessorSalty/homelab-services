@@ -8,6 +8,8 @@ entryPoints:
   web:
     address: ":80"
     http:
+      middlewares:
+        - allowFrames@file
       redirections:
         entryPoint:
           to: secure
@@ -15,6 +17,9 @@ entryPoints:
 
   secure:
     address: ":443"
+    http:
+      middlewares:
+        - allowFrames@file
 
 metrics:
   prometheus:
@@ -24,6 +29,7 @@ metrics:
 providers:
     file:
       filename: ./dynamic.yml
+      watch: true
     docker:
         exposedByDefault: false
         network: proxy

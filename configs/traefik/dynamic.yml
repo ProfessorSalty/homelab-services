@@ -5,8 +5,6 @@ http:
         - secure
       rule: Host(`dashboard.{{ env "ROOT_DOMAIN" }}`)
       service: api@internal
-      middlewares:
-        - allowFrames
       tls:
         certresolver: "le"
         domains:
@@ -24,6 +22,15 @@ http:
         prefix: /guacamole
     allowFrames:
       headers:
-          contentSecurityPolicy: frame-ancestors 'self' *.{{ env "ROOT_DOMAIN" }}
+          contentSecurityPolicy: frame-ancestors 'self' startpage.{{ env "ROOT_DOMAIN" }} 
           stsIncludeSubdomains: true
           frameDeny: false
+          sslForceHost: true
+          sslRedirect: true
+          customFrameOptionsValue: SAMEORIGIN
+          customResponseHeaders:
+            X-Scheme: https
+            X-Forwarded-Proto: https
+          customRequestHeaders:
+            X-Scheme: https
+            X-Forwarded-Proto: https

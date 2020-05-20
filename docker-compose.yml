@@ -7,7 +7,6 @@ networks:
     authelia:
     bookstack:
     guacamole:
-    wekan:
     exporters:
     portus:
     grafana:
@@ -18,6 +17,7 @@ volumes:
     jenkinsdata:
     portainer_data:
     bookstack:
+    transcoding:
 
 services:
     ###############################
@@ -206,7 +206,7 @@ services:
             - "traefik.enable=true"
             - "traefik.http.routers.grafana.rule=Host(`graphs.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.grafana.entrypoints=secure"
-            - "traefik.http.routers.grafana.middlewares=allowFrames@file"
+            - "traefik.http.routers.grafana.middlewares="
             - "traefik.http.services.grafana.loadbalancer.server.port=3000"
             - "traefik.http.routers.grafana.tls=true"
 
@@ -471,7 +471,7 @@ services:
             - "traefik.enable=true"
             - "traefik.http.routers.phpldapadmin.rule=Host(`admin.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.phpldapadmin.entrypoints=secure"
-            - "traefik.http.routers.phpldapadmin.middlewares=allowFrames@file"
+            - "traefik.http.routers.phpldapadmin.middlewares="
             - "traefik.http.routers.phpldapadmin.tls=true"
 
     ###############################
@@ -520,7 +520,7 @@ services:
             - "traefik.http.middlewares.nextcloud-caldav.redirectregex.permanent=true"
             - "traefik.http.middlewares.nextcloud-caldav.redirectregex.regex=^https://(.*)/.well-known/(card|cal)dav"
             - "traefik.http.middlewares.nextcloud-caldav.redirectregex.replacement=https://$${1}/remote.php/dav/"
-            - "traefik.http.routers.nextcloud.middlewares=nextcloud-caldav@docker,allowFrames@file"
+            - "traefik.http.routers.nextcloud.middlewares=nextcloud-caldav@docker"
             - "traefik.http.routers.nextcloud.entrypoints=secure"
             - "traefik.http.routers.nextcloud.rule=Host(`cloud.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.nextcloud.tls=true"
@@ -554,6 +554,7 @@ services:
             - POSTGRES_DB=nextcloud
             - NEXTCLOUD_HOSTNAME=cloud.${ROOT_DOMAIN}
             - NEXTCLOUD_TRUSTED_DOMAINS=cloud.${ROOT_DOMAIN} ${ROOT_DOMAIN} localhost
+            - OVERWRITEPROTOCOL=https
             - REDIS_HOST=nextcloud-cache
             - SMTP_HOST=smtp
             - SMTP_AUTH_TYPE=NONE
@@ -596,21 +597,23 @@ services:
     #           Emby              #
     ###############################
     emby:
-        image: linuxserver/emby
+        image: emby/embyserver
         container_name: emby
         restart: unless-stopped
+        logging:
+            driver: "loki"
+            options:
+                loki-url: "http://localhost:3100/loki/api/v1/push"
         networks:
             - proxy
         environment:
-            - UID=1000
-            - GID=1000
+            - UID=${UID}
+            - GID=${GID}
             - TZ
         volumes:
-            - ${SERVICES_ROOT}/${EMBY_ROOT:-emby}/media:/media:ro
             - ${SERVICES_ROOT}/${EMBY_ROOT:-emby}/transcoding:/transcoding
+            - ${SERVICES_ROOT}/${EMBY_ROOT:-emby}/media:/media:ro
             - ${SERVICES_ROOT}/${EMBY_ROOT:-emby}/config:/config
-        devices:
-            - /dev/dri:/dev/dri
         labels:
             - "traefik.enable=true"
             - "traefik.http.services.emby.loadbalancer.server.port=8096"
@@ -667,39 +670,39 @@ services:
     #         - "traefik.http.routers.jellyfin.entrypoints=secure"
     #         - "traefik.http.routers.jellyfin.tls=true"
 
-    ###############################
-    #           Gitlab            #
-    ###############################
-    gitlab:
-        image: 'gitlab/gitlab-ce:latest'
-        hostname: 'git.${ROOT_DOMAIN}'
-        container_name: gitlab
-        logging:
-            driver: "loki"
-            options:
-                loki-url: "http://localhost:3100/loki/api/v1/push"
-        environment:
-            - GITLAB_OMNIBUS_CONFIG="external_url 'https://git.${ROOT_DOMAIN}'"
-            - USER_UID=${UID}
-            - USER_GID=${GID}
-            - TZ
-        restart: unless-stopped
-        networks:
-            - proxy
-        volumes:
-            - ${SERVICES_ROOT}/${GITLAN_ROOT:-gitlab}/config:/etc/gitlab
-            - ${SERVICES_ROOT}/${GITLAN_ROOT:-gitlab}/data:/var/opt/gitlab
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.gitlab.rule=Host(`git.${ROOT_DOMAIN}`)"
-            - "traefik.http.routers.gitlab.entrypoints=secure"
-            - "traefik.http.routers.gitlab.service=gitlab-web-svc"
-            - "traefik.http.services.gitlab-web-svc.loadbalancer.server.port=80"
-            - "traefik.tcp.routers.gitlab-ssh.rule=HostSNI(`*`)"
-            - "traefik.tcp.routers.gitlab-ssh.entrypoints=ssh"
-            - "traefik.tcp.routers.gitlab-ssh.service=gitlab-ssh-svc"
-            - "traefik.tcp.services.gitlab-ssh-svc.loadbalancer.server.port=22"
-            - "traefik.http.routers.gitlab.tls=true"
+    # ###############################
+    # #           Gitlab            #
+    # ###############################
+    # gitlab:
+    #     image: 'gitlab/gitlab-ce:latest'
+    #     hostname: 'git.${ROOT_DOMAIN}'
+    #     container_name: gitlab
+    #     logging:
+    #         driver: "loki"
+    #         options:
+    #             loki-url: "http://localhost:3100/loki/api/v1/push"
+    #     environment:
+    #         - GITLAB_OMNIBUS_CONFIG="external_url 'https://git.${ROOT_DOMAIN}'"
+    #         - USER_UID=${UID}
+    #         - USER_GID=${GID}
+    #         - TZ
+    #     restart: unless-stopped
+    #     networks:
+    #         - proxy
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${GITLAN_ROOT:-gitlab}/config:/etc/gitlab
+    #         - ${SERVICES_ROOT}/${GITLAN_ROOT:-gitlab}/data:/var/opt/gitlab
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.gitlab.rule=Host(`git.${ROOT_DOMAIN}`)"
+    #         - "traefik.http.routers.gitlab.entrypoints=secure"
+    #         - "traefik.http.routers.gitlab.service=gitlab-web-svc"
+    #         - "traefik.http.services.gitlab-web-svc.loadbalancer.server.port=80"
+    #         - "traefik.tcp.routers.gitlab-ssh.rule=HostSNI(`*`)"
+    #         - "traefik.tcp.routers.gitlab-ssh.entrypoints=ssh"
+    #         - "traefik.tcp.routers.gitlab-ssh.service=gitlab-ssh-svc"
+    #         - "traefik.tcp.services.gitlab-ssh-svc.loadbalancer.server.port=22"
+    #         - "traefik.http.routers.gitlab.tls=true"
 
     ###############################
     #           Portus            #
@@ -751,7 +754,7 @@ services:
             - "traefik.http.routers.portus.rule=Host(`registry.${ROOT_DOMAIN}`)"
             - "traefik.http.services.portus.loadbalancer.server.port=3000"
             - "traefik.http.routers.portus.entrypoints=secure"
-            - "traefik.http.routers.portus.middlewares=allowFrames@file"
+            - "traefik.http.routers.portus.middlewares="
             - "traefik.http.routers.portus.tls=true"
     portus-db:
         image: linuxserver/mariadb
@@ -942,91 +945,11 @@ services:
         labels:
             - "traefik.enable=true"
             - "traefik.http.routers.calibre-web.rule=Host(`library.${ROOT_DOMAIN}`)"
+            - "traefik.http.routers.calibre-web.middlewares="
             - "traefik.http.routers.calibre-web.entrypoints=secure"
             - "traefik.http.services.calibre-web.loadbalancer.server.port=8083"
             - "traefik.http.routers.calibre-web.tls=true"
 
-    ###############################
-    #           Wekan             #
-    ###############################
-    wekan-db:
-        image: mongo:latest
-        container_name: wekan-db
-        logging:
-            driver: "loki"
-            options:
-                loki-url: "http://localhost:3100/loki/api/v1/push"
-        restart: always
-        command: mongod --oplogSize 128
-        networks:
-            - proxy
-            - wekan
-        expose:
-            - 27017
-        volumes:
-            - ${SERVICES_ROOT}/${WEKAN_ROOT:-wekan}/db:/data/db
-            - ${SERVICES_ROOT}/${WEKAN_ROOT:-wekan}/db-dump:/dump
-
-    wekan:
-        image: mquandalle/wekan
-        container_name: wekan-app
-        logging:
-            driver: "loki"
-            options:
-                loki-url: "http://localhost:3100/loki/api/v1/push"
-        restart: always
-        networks:
-            - proxy
-            - wekan
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.wekan.rule=Host(`boards.${ROOT_DOMAIN}`)"
-            - "traefik.http.routers.wekan.entrypoints=secure"
-            - "traefik.http.services.wekan.loadbalancer.server.port=8080"
-            - "traefik.http.routers.wekan.tls=true"
-        environment:
-            #- DEBUG=true
-            - MONGO_URL=mongodb://wekan-db:27017/wekan
-            - ROOT_URL=https://boards.${ROOT_DOMAIN}
-            - MAIL_URL=smtp
-            - MAIL_FROM=notifications@${ROOT_DOMAIN}
-            - WITH_API=true
-            - RICHER_CARD_COMMENT_EDITOR=true
-            - SCROLLINERTIA=0
-            - SCROLLAMOUNT=auto
-            - CARD_OPENED_WEBHOOK_ENABLED=false
-            - CORS=*
-            - CORS_ALLOW_HEADERS=Authorization,Content-Type
-            - CORS_EXPOSE_HEADERS=*
-            - BROWSER_POLICY_ENABLED=true
-            - WEBHOOKS_ATTRIBUTES=cardId,listId,oldListId,boardId,comment,user,card,commentId
-            - DEFAULT_AUTHENTICATION_METHOD=ldap
-            - LDAP_ENABLE=true
-            - LDAP_PORT=389
-            - LDAP_HOST=openldap
-            - LDAP_BASEDN=ou=people,${LDAP_LOGIN_BASE}
-            - LDAP_LOGIN_FALLBACK=false
-            - LDAP_RECONNECT=true
-            - LDAP_TIMEOUT=10000
-            - LDAP_IDLE_TIMEOUT=10000
-            - LDAP_CONNECT_TIMEOUT=10000
-            - LDAP_AUTHENTIFICATION=true
-            - LDAP_AUTHENTIFICATION_USERDN=cn=admin,${LDAP_LOGIN_BASE}
-            - LDAP_AUTHENTIFICATION_PASSWORD=${LDAP_ADMIN_PASSWORD}
-            - LDAP_LOG_ENABLED=true
-            - LDAP_BACKGROUND_SYNC=false
-            - LDAP_BACKGROUND_SYNC_INTERVAL='every 1 hour'
-            - LDAP_BACKGROUND_SYNC_KEEP_EXISTANT_USERS_UPDATED=false
-            - LDAP_BACKGROUND_SYNC_IMPORT_NEW_USERS=false
-            - LDAP_ENCRYPTION=false
-            - LDAP_USER_AUTHENTICATION_FIELD="uid"
-            - LDAP_USER_SEARCH_FIELD=uid
-            - LDAP_USERNAME_FIELD=uid
-            - LDAP_FULLNAME_FIELD=displayName
-            - LDAP_GROUP_FILTER_GROUP_MEMBER_ATTRIBUTE=memberof
-        depends_on:
-            - wekan-db
-   
     ###############################
     #           Duplicati         #
     ###############################
@@ -1168,7 +1091,7 @@ services:
             - "traefik.http.routers.radarr.rule=Host(`radarr.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.radarr.entrypoints=secure"
             - "traefik.http.services.radarr.loadbalancer.server.port=7878"
-            - "traefik.http.routers.radarr.middlewares=authelia@file,allowFrames@file"
+            - "traefik.http.routers.radarr.middlewares=authelia@file"
             - "traefik.http.routers.radarr.tls=true"
         restart: unless-stopped
 
@@ -1198,7 +1121,7 @@ services:
             - "traefik.http.routers.lidarr.rule=Host(`lidarr.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.lidarr.entrypoints=secure"
             - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
-            - "traefik.http.routers.lidarr.middlewares=authelia@file,allowFrames@file"
+            - "traefik.http.routers.lidarr.middlewares=authelia@file"
             - "traefik.http.routers.lidarr.tls=true"
         restart: unless-stopped
 
@@ -1228,36 +1151,8 @@ services:
             - "traefik.http.routers.sonarr.rule=Host(`sonarr.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.sonarr.entrypoints=secure"
             - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
-            - "traefik.http.routers.sonarr.middlewares=authelia@file,allowFrames@file"
+            - "traefik.http.routers.sonarr.middlewares=authelia@file"
             - "traefik.http.routers.sonarr.tls=true"
-        restart: unless-stopped
-
-    ###############################
-    #         Tdarr               #
-    ###############################
-    tdarr:
-        image: haveagitgat/tdarr_aio
-        container_name: tdarr
-        logging:
-            driver: "loki"
-            options:
-                loki-url: "http://localhost:3100/loki/api/v1/push"
-        networks:
-            - proxy
-        volumes:
-            - ${SERVICES_ROOT}/${TDARR_ROOT:-tdarr}/data:/home/Tdarr/Documents/Tdarr
-            - ${SERVICES_ROOT}/${TDARR_ROOT:-tdarr}/cache:/home/Tdarr/cache
-            - ${SERVICES_ROOT}/${TDARR_ROOT:-tdarr}/db:/var/lib/mongodb
-            - ${MOVIES_ROOT}:/home/Tdarr/Media/movies
-            - ${TV_ROOT}:/home/Tdarr/Media/tv
-            - /etc/localtime:/etc/localtime:ro
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.tdarr.rule=Host(`tdarr.${ROOT_DOMAIN}`)"
-            - "traefik.http.routers.tdarr.entrypoints=secure"
-            - "traefik.http.services.tdarr.loadbalancer.server.port=8265"
-            - "traefik.http.routers.tdarr.middlewares=authelia@file"
-            - "traefik.http.routers.tdarr.tls=true"
         restart: unless-stopped
 
     ###############################
@@ -1288,7 +1183,7 @@ services:
             - "traefik.http.routers.sabnzbd.rule=Host(`newsreader.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.sabnzbd.entrypoints=secure"
             - "traefik.http.services.sabnzbd.loadbalancer.server.port=8080"
-            - "traefik.http.routers.sabnzbd.middlewares=authelia@file,allowFrames@file"
+            - "traefik.http.routers.sabnzbd.middlewares=authelia@file"
             - "traefik.http.routers.sabnzbd.tls=true"
         restart: unless-stopped
 
@@ -1316,12 +1211,13 @@ services:
             - ${BOOKS_ROOT}:/books
             - ${MUSIC_ROOT}:/music
             - ${DOWNLOADS_ROOT}:/downloads
+            - ${TORRENTS_ROOT}:/blackhole
         labels:
             - "traefik.enable=true"
             - "traefik.http.routers.syncthing.rule=Host(`sync.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.syncthing.entrypoints=secure"
             - "traefik.http.services.syncthing.loadbalancer.server.port=8384"
-            - "traefik.http.routers.syncthing.middlewares=authelia@file,allowFrames@file"
+            - "traefik.http.routers.syncthing.middlewares=authelia@file"
             - "traefik.http.routers.syncthing.tls=true"
         ports:
             - 22000:22000
@@ -1438,29 +1334,10 @@ services:
             - "traefik.enable=true"
             - "traefik.http.routers.lazylibrarian.rule=Host(`lazylibrarian.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.lazylibrarian.entrypoints=secure"
+            - "traefik.http.routers.lazylibrarian.middlewares="
             - "traefik.http.services.lazylibrarian.loadbalancer.server.port=5299"
+            - "traefik.http.services.lazylibrarian.loadbalancer.passHostHeader=true"
             - "traefik.http.routers.lazylibrarian.tls=true"
-
-    ##############################
-    #        Heimdall            #
-    ##############################
-    heimdall:
-        image: linuxserver/heimdall
-        container_name: heimdall
-        environment:
-            - PUID=1000
-            - PGID=1000
-            - TZ
-        volumes:
-            - ${SERVICES_ROOT}/${HEIMDALL_ROOT:-heimdall}:/config
-        restart: unless-stopped
-        networks:
-            - proxy
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.heimdall.rule=Host(`homepage.${ROOT_DOMAIN}`)"
-            - "traefik.http.routers.heimdall.entrypoints=secure"
-            - "traefik.http.routers.heimdall.tls=true"
 
     ###############################
     #         Jackett             #
@@ -1530,6 +1407,7 @@ services:
             - proxy
         volumes:
             - ${SERVICES_ROOT}/${NZBHYDRA_ROOT:-nzbhydra}/config:/config
+            - ${TORRENTS_ROOT}:/blackhole
             - ${DOWNLOADS_ROOT}:/downloads
         labels:
             - "traefik.enable=true"
@@ -1538,29 +1416,4 @@ services:
             - "traefik.http.services.nzbhydra.loadbalancer.server.port=5076"
             - "traefik.http.routers.nzbhydra.middlewares=authelia@file"
             - "traefik.http.routers.nzbhydra.tls=true"
-        restart: unless-stopped
-
-    ###############################
-    #         Mylar               #
-    ###############################
-    mylar:
-        image: hotio/mylar3
-        container_name: mylar
-        environment:
-            - PUID=1000
-            - PGID=1000
-            - UMASK=022
-            - TZ
-        networks:
-            - proxy
-        volumes:
-            - ${SERVICES_ROOT}/${MYLAR_ROOT:-mylar}/config:/config
-            - ${DOWNLOADS_ROOT}:/downloads
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.mylar.rule=Host(`mylar.${ROOT_DOMAIN}`)"
-            - "traefik.http.routers.mylar.entrypoints=secure"
-            - "traefik.http.services.mylar.loadbalancer.server.port=8090"
-            - "traefik.http.routers.mylar.middlewares=authelia@file"
-            - "traefik.http.routers.mylar.tls=true"
         restart: unless-stopped
