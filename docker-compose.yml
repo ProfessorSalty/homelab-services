@@ -5,10 +5,10 @@ networks:
         name: proxy
     nextcloud:
     authelia:
-    bookstack:
+    wikijs:
     guacamole:
     exporters:
-    portus:
+    # portus:
     grafana:
     loki:
 
@@ -16,26 +16,9 @@ volumes:
     nextcloud:
     jenkinsdata:
     portainer_data:
-    bookstack:
     transcoding:
 
 services:
-    ###############################
-    #       Cloudflare DDNS       #
-    ###############################
-    cloudflare-ddns:
-        image: oznu/cloudflare-ddns:latest
-        container_name: cloudflare-ddns
-        logging:
-            driver: "loki"
-            options:
-                loki-url: "http://localhost:3100/loki/api/v1/push"
-        restart: unless-stopped
-        environment:
-            - API_KEY=${CLOUDFLARE_DDNS_API_KEY}
-            - ZONE=${ROOT_DOMAIN}
-            - PROXIED=true
-
     # ###############################
     # #          Watchtower         #
     # ###############################
@@ -62,7 +45,7 @@ services:
     #         - TZ
             
     ###############################
-    #          Librespeed         #
+    #          Speedtest          #
     ###############################
     speedtest:
         image: henrywhitaker3/speedtest-tracker
@@ -165,10 +148,6 @@ services:
         image: grafana/grafana
         container_name: grafana
         user: "472:472"
-        logging:
-            driver: "loki"
-            options:
-                loki-url: "http://localhost:3100/loki/api/v1/push"
         networks:
             - proxy
             - grafana
@@ -206,7 +185,6 @@ services:
             - "traefik.enable=true"
             - "traefik.http.routers.grafana.rule=Host(`graphs.${ROOT_DOMAIN}`)"
             - "traefik.http.routers.grafana.entrypoints=secure"
-            - "traefik.http.routers.grafana.middlewares="
             - "traefik.http.services.grafana.loadbalancer.server.port=3000"
             - "traefik.http.routers.grafana.tls=true"
 
@@ -505,7 +483,7 @@ services:
         volumes:
             - nextcloud:/var/www/html:ro
             - ./configs/nextcloud/nginx.conf:/etc/nginx/nginx.conf:ro
-            - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT:-nextcloud}/data:/var/www/html/data
+            - ${NEXTCLOUD_DATA}:/var/www/html/data
             - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT:-nextcloud}/config:/var/www/html/config
             - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT:-nextcloud}/custom_apps:/var/www/html/custom_apps
             - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT:-nextcloud}/themes:/var/www/html/themes
@@ -541,7 +519,7 @@ services:
             - nextcloud-cache
         volumes:
             - nextcloud:/var/www/html
-            - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT:-nextcloud}/data:/var/www/html/data
+            - ${NEXTCLOUD_DATA}:/var/www/html/data
             - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT:-nextcloud}/config:/var/www/html/config
             - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT:-nextcloud}/custom_apps:/var/www/html/custom_apps
             - ${SERVICES_ROOT}/${NEXTCLOUD_ROOT:-nextcloud}/themes:/var/www/html/themes
@@ -707,163 +685,125 @@ services:
     ###############################
     #           Portus            #
     ###############################
-    portus:
-        image: opensuse/portus:2.4
-        container_name: portus
-        logging:
-            driver: "loki"
-            options:
-                loki-url: "http://localhost:3100/loki/api/v1/push"
-        restart: unless-stopped
-        environment:
-            - PORTUS_CHECK_SSL_USAGE_ENABLED=false
-            - PORTUS_SECRET_KEY_BASE
-            - PORTUS_PASSWORD
-            - PORTUS_KEY_PATH=/certificates/portus.key
-            - CCONFIG_PREFIX=PORTUS
-            - RAILS_SERVE_STATIC_FILES=true
-            - PORTUS_EMAIL_FROM=notifications@${ROOT_DOMAIN}
-            - PORTUS_EMAIL_NAME=Portus
-            - PORTUS_EMAIL_REPLY_TO=notifications@${ROOT_DOMAIN}
-            - PORTUS_EMAIL_SMTP_ENABLED=true
-            - PORTUS_EMAIL_SMTP_ADDRESS=smtp
-            - PORTUS_EMAIL_SMTP_DOMAIN=${ROOT_DOMAIN}
-            - PORTUS_EMAIL_SMTP_PORT=587
-            - PORTUS_LDAP_ENABLED=true
-            - PORTUS_LDAP_HOSTNAME=openldap
-            - PORTUS_LDAP_PORT=389
-            - PORTUS_LDAP_UID=uid
-            - PORTUS_LDAP_BASE=ou=people,${LDAP_LOGIN_BASE}
-            - PORTUS_LDAP_AUTHENTICATION_ENABLED=true
-            - PORTUS_LDAP_AUTHENTICATION_BIND_DN=cn=admin,${LDAP_LOGIN_BASE}
-            - PORTUS_LDAP_AUTHENTICATION_PASSWORD=${LDAP_ADMIN_PASSWORD}
-            - PORTUS_LDAP_GROUP_BASE=cn=dev,ou=groups,${LDAP_LOGIN_BASE}
-            - PORTUS_LDAP_GUESS_EMAIL_ENALBED=true
-            - PORTUS_LDAP_GUESS_EMAIL_ATTR=mail
-            - PORTUS_DB_HOST=portus-db
-            - PORTUS_DB_DATABASE=portus
-            - PORTUS_DB_USERNAME=portus
-            - PORTUS_DB_PASSWORD
-            - PORTUS_MACHINE_FQDN_VALUE=registry.${ROOT_DOMAIN}
-            - TZ
-        networks:
-            - proxy
-            - portus
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.portus.rule=Host(`registry.${ROOT_DOMAIN}`)"
-            - "traefik.http.services.portus.loadbalancer.server.port=3000"
-            - "traefik.http.routers.portus.entrypoints=secure"
-            - "traefik.http.routers.portus.middlewares="
-            - "traefik.http.routers.portus.tls=true"
-    portus-db:
-        image: linuxserver/mariadb
-        container_name: portus-db
-        logging:
-            driver: "loki"
-            options:
-                loki-url: "http://localhost:3100/loki/api/v1/push"
-        environment:
-            - PUID=1000
-            - PGID=1000
-            - MYSQL_ROOT_PASSWORD=${PORTUS_DB_ADMIN_PASSWORD:?Admin password for portus-db must be set!}
-            - MYSQL_DATABASE=portus
-            - MYSQL_USER=portus
-            - MYSQL_PASSWORD=${PORTUS_DB_PASSWORD:?User password for portus must be set!}
-            - TZ
-        volumes:
-            - ${SERVICES_ROOT}/${PORTUS_ROOT:-portus}/db:/config
-        networks:
-            - portus
-        restart: unless-stopped
+    # portus:
+    #     image: opensuse/portus:2.4
+    #     container_name: portus
+    #     logging:
+    #         driver: "loki"
+    #         options:
+    #             loki-url: "http://localhost:3100/loki/api/v1/push"
+    #     restart: unless-stopped
+    #     environment:
+    #         - PORTUS_CHECK_SSL_USAGE_ENABLED=false
+    #         - PORTUS_SECRET_KEY_BASE
+    #         - PORTUS_PASSWORD
+    #         - PORTUS_KEY_PATH=/certificates/portus.key
+    #         - CCONFIG_PREFIX=PORTUS
+    #         - RAILS_SERVE_STATIC_FILES=true
+    #         - PORTUS_EMAIL_FROM=notifications@${ROOT_DOMAIN}
+    #         - PORTUS_EMAIL_NAME=Portus
+    #         - PORTUS_EMAIL_REPLY_TO=notifications@${ROOT_DOMAIN}
+    #         - PORTUS_EMAIL_SMTP_ENABLED=true
+    #         - PORTUS_EMAIL_SMTP_ADDRESS=smtp
+    #         - PORTUS_EMAIL_SMTP_DOMAIN=${ROOT_DOMAIN}
+    #         - PORTUS_EMAIL_SMTP_PORT=587
+    #         - PORTUS_LDAP_ENABLED=true
+    #         - PORTUS_LDAP_HOSTNAME=openldap
+    #         - PORTUS_LDAP_PORT=389
+    #         - PORTUS_LDAP_UID=uid
+    #         - PORTUS_LDAP_BASE=ou=people,${LDAP_LOGIN_BASE}
+    #         - PORTUS_LDAP_AUTHENTICATION_ENABLED=true
+    #         - PORTUS_LDAP_AUTHENTICATION_BIND_DN=cn=admin,${LDAP_LOGIN_BASE}
+    #         - PORTUS_LDAP_AUTHENTICATION_PASSWORD=${LDAP_ADMIN_PASSWORD}
+    #         - PORTUS_LDAP_GROUP_BASE=cn=dev,ou=groups,${LDAP_LOGIN_BASE}
+    #         - PORTUS_LDAP_GUESS_EMAIL_ENALBED=true
+    #         - PORTUS_LDAP_GUESS_EMAIL_ATTR=mail
+    #         - PORTUS_DB_HOST=portus-db
+    #         - PORTUS_DB_DATABASE=portus
+    #         - PORTUS_DB_USERNAME=portus
+    #         - PORTUS_DB_PASSWORD
+    #         - PORTUS_MACHINE_FQDN_VALUE=registry.${ROOT_DOMAIN}
+    #         - TZ
+    #     networks:
+    #         - proxy
+    #         - portus
+    #     labels:
+    #         - "traefik.enable=true"
+    #         - "traefik.http.routers.portus.rule=Host(`registry.${ROOT_DOMAIN}`)"
+    #         - "traefik.http.services.portus.loadbalancer.server.port=3000"
+    #         - "traefik.http.routers.portus.entrypoints=secure"
+    #         - "traefik.http.routers.portus.middlewares="
+    #         - "traefik.http.routers.portus.tls=true"
+    # portus-db:
+    #     image: linuxserver/mariadb
+    #     container_name: portus-db
+    #     logging:
+    #         driver: "loki"
+    #         options:
+    #             loki-url: "http://localhost:3100/loki/api/v1/push"
+    #     environment:
+    #         - PUID=1000
+    #         - PGID=1000
+    #         - MYSQL_ROOT_PASSWORD=${PORTUS_DB_ADMIN_PASSWORD:?Admin password for portus-db must be set!}
+    #         - MYSQL_DATABASE=portus
+    #         - MYSQL_USER=portus
+    #         - MYSQL_PASSWORD=${PORTUS_DB_PASSWORD:?User password for portus must be set!}
+    #         - TZ
+    #     volumes:
+    #         - ${SERVICES_ROOT}/${PORTUS_ROOT:-portus}/db:/config
+    #     networks:
+    #         - portus
+    #     restart: unless-stopped
 
     ###############################
-    #           Bookstack         #
+    #           Wiki.js           #
     ###############################
-    bookstack:
-        image: linuxserver/bookstack
-        container_name: bookstack
+    wikijs:
+        image: requarks/wiki
+        container_name: wikijs
         logging:
             driver: "loki"
             options:
                 loki-url: "http://localhost:3100/loki/api/v1/push"
         environment:
-            # - APP_DEBUG=true
-            # - LDAP_DUMP_USER_DETAILS=true
-            - APP_URL=https://wiki.${ROOT_DOMAIN}
-            - PUID=1000
-            - PGID=1000
-            - DB_HOST=bookstack-db
-            - DB_USER=bookstack
-            - DB_PASS=${BOOKSTACK_DB_PASSWORD}
-            - DB_DATABASE=bookstackapp
-            - AUTH_METHOD=ldap
-            - LDAP_SERVER=openldap
-            - LDAP_BASE_DN=ou=people,${LDAP_LOGIN_BASE}
-            - LDAP_DN=cn=admin,${LDAP_LOGIN_BASE}
-            - LDAP_PASS=${LDAP_ADMIN_PASSWORD}
-            - LDAP_USER_FILTER=(&(uid=$${user}))
-            - LDAP_VERSION=3
-            - LDAP_ID_ATTRIBUTE=uid
-            - LDAP_EMAIL_ATTRIBUTE=mail
-            - LDAP_DISPLAY_NAME_ATTRIBUTE=cn
-            - LDAP_TLS_INSECURE=true
-            - MAIL_DRIVER=smtp
-            - MAIL_HOST=smtp
-            - MAIL_PORT=587
-            - MAIL_FROM=notifications@${ROOT_DOMAIN}
-            - CACHE_DRIVER=redis
-            - SESSION_DRIVER=redis
-            - REDIS_SERVERS=bookstack-cache:6379:0
+            - DB_TYPE=postgres
+            - DB_PORT=5432
+            - DB_HOST=wikijs-db
+            - DB_NAME=wikijsapp
+            - DB_USER=wikijs
+            - DB_PASS=${WIKIJS_DB_PASSWORD}
         volumes:
-            - ${SERVICES_ROOT}/${BOOKSTACK_ROOT:-bookstack}/config:/config
+            - ${SERVICES_ROOT}/${WIKIJS_ROOT:-wikijs}/config:/config
         restart: unless-stopped
-        expose:
-            - 80
         labels:
             - "traefik.enable=true"
-            - "traefik.http.routers.bookstack.rule=Host(`wiki.${ROOT_DOMAIN}`)"
-            - "traefik.http.routers.bookstack.entrypoints=secure"
-            - "traefik.http.routers.bookstack.tls=true"
+            - "traefik.http.routers.wikijs.rule=Host(`wiki.${ROOT_DOMAIN}`)"
+            - "traefik.http.routers.wikijs.entrypoints=secure"
+            - "traefik.http.routers.wikijs.tls=true"
+            - "treafik.http.services.wikijs.loadbalancer.server.port=3000"
         networks:
             - proxy
-            - bookstack
+            - wikijs
         depends_on:
-            - bookstack-db
+            - wikijs-db
 
-    bookstack-db:
-        image: linuxserver/mariadb
+    wikijs-db:
+        image: postgres:12-alpine
         logging:
             driver: "loki"
             options:
                 loki-url: "http://localhost:3100/loki/api/v1/push"
-        container_name: bookstack-db
+        container_name: wikijs-db
         environment:
-            - PUID=1000
-            - PGID=1000
-            - MYSQL_ROOT_PASSWORD=${BOOKSTACK_DB_ADMIN_PASSWORD:?Admin password for bookstack-db must be set!}
-            - MYSQL_DATABASE=bookstackapp
-            - MYSQL_USER=bookstack
-            - MYSQL_PASSWORD=${BOOKSTACK_DB_PASSWORD:?User password for bookstack must be set!}
+            - POSTGRES_DB=wikijsapp
+            - POSTGRES_USER=wikijs
+            - POSTGRES_PASSWORD=${WIKIJS_DB_PASSWORD:?User password for wikijs must be set!}
             - TZ
         volumes:
-            - ${SERVICES_ROOT}/${BOOKSTACK_ROOT:-bookstack}/db:/config
+            - ${SERVICES_ROOT}/${WIKIJS_ROOK:-wikijs}/db:/var/lib/postgresql/data
         networks:
-            - bookstack
+            - wikijs
         restart: unless-stopped
-
-    bookstack-cache:
-        image: redis:alpine
-        container_name: bookstack-cache
-        logging:
-            driver: "loki"
-            options:
-                loki-url: "http://localhost:3100/loki/api/v1/push"
-        environment:
-            - TZ
-        restart: unless-stopped
-        networks:
-            - bookstack
 
     ##############################
     #          Organizr          #
@@ -1176,7 +1116,7 @@ services:
         volumes:
             - ./configs/sabnzbd/sabnzbd.template:/config/sabnzbd.template
             - ${SERVICES_ROOT}/${SABNZBD_ROOT:-sabnzbd}/config:/config
-            - ${SERVICES_ROOT}/${SABNZBD_ROOT:-sabnzbd}/intermediate:/intermediate
+            - ${SERVICES_ROOT}/${SABNZBD_ROOT:-sabnzbd}/intermediate:/incomplete-downloads
             - ${DOWNLOADS_ROOT}:/downloads
         labels:
             - "traefik.enable=true"
@@ -1369,29 +1309,29 @@ services:
         restart: unless-stopped
 
     ###############################
-    #         ruTorrent           #
+    #         qBittorrent          #
     ###############################
-    rutorrent:
-        image: linuxserver/rutorrent
-        container_name: rutorrent
+    qbittorrent:
+        image: linuxserver/qbittorrent
+        container_name: qbittorrent
         environment:
             - PUID=1000
             - PGID=1000
         networks:
             - proxy
         volumes:
-            - ${SERVICES_ROOT}/${RUTORRENT_ROOT:-rutorrent}/config:/config
+            - ${SERVICES_ROOT}/${QBITTORRENT_ROOT:-qbittorrent}/config:/config
             - ${DOWNLOADS_ROOT}:/downloads
         labels:
             - "traefik.enable=true"
-            - "traefik.http.routers.rutorrent.rule=Host(`torrent.${ROOT_DOMAIN}`)"
-            - "traefik.http.routers.rutorrent.entrypoints=secure"
-            - "traefik.http.routers.rutorrent.middlewares=authelia@file"
-            - "traefik.http.routers.rutorrent.tls=true"
+            - "traefik.http.routers.qbittorrent.rule=Host(`torrent.${ROOT_DOMAIN}`)"
+            - "traefik.http.routers.qbittorrent.entrypoints=secure"
+            - "traefik.http.routers.qbittorrent.middlewares=authelia@file"
+            - "traefik.http.routers.qbittorrent.tls=true"
+            - "traefik.http.services.qbittorrent.loadbalancer.server.port=8080"
         ports:
-            - 5000:5000
-            - 51413:51413
             - 6881:6881/udp
+            - 6881:6881
         restart: unless-stopped
         
     ###############################
