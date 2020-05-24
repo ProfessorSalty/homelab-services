@@ -27,6 +27,7 @@ http:
           frameDeny: false
           sslForceHost: true
           sslRedirect: true
+          stsSeconds: 15552000
           customFrameOptionsValue: SAMEORIGIN
           customResponseHeaders:
             X-Scheme: https
